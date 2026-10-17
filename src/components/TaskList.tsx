@@ -177,11 +177,6 @@ export const TaskList: React.FC<TaskListProps> = ({
                     <div className="flex items-center gap-1.5 font-semibold tabular-nums">
                       <CalendarIcon className="w-3.5 h-3.5 text-slate-400" />
                       <span>{formatDatePT(task.date)}</span>
-                      {task.nominalDay && parseInt(task.date.split('-')[2], 10) !== task.nominalDay ? (
-                        <span className="text-[10px] font-normal text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/50">
-                          Ajustado do dia {task.nominalDay}
-                        </span>
-                      ) : null}
                     </div>
 
                     {task.description && (

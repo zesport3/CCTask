@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   Plus,
@@ -10,16 +10,37 @@ import {
   ArchiveRestore,
   Check,
   AlertCircle,
+  Calendar,
+  CheckSquare,
+  Square,
+  Sparkles,
+  Info,
+  CalendarDays,
+  Clock,
+  Layers,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { Client, AccountingTask } from '../types/accounting';
+import {
+  getAvailableAssignableObligations,
+  getClientAssignedTaskKeys,
+  AssignableObligation,
+} from '../utils/clientTaskUtils';
 
 interface ClientManagerModalProps {
   isOpen: boolean;
   onClose: () => void;
   clients: Client[];
   tasks: AccountingTask[];
-  onAddClient: (client: Omit<Client, 'id' | 'createdAt'>) => void;
-  onUpdateClient: (client: Client) => void;
+  onAddClient: (
+    client: Omit<Client, 'id' | 'createdAt'>,
+    selectedTaskSeriesIds?: string[]
+  ) => void;
+  onUpdateClient: (
+    client: Client,
+    selectedTaskSeriesIds?: string[]
+  ) => void;
   onDeleteClient: (clientId: string) => void;
   onToggleArchiveClient: (clientId: string) => void;
 }
@@ -43,7 +64,15 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
   const [name, setName] = useState('');
   const [nif, setNif] = useState('');
   const [notes, setNotes] = useState('');
+  const [selectedTaskKeys, setSelectedTaskKeys] = useState<string[]>([]);
+  const [taskSearch, setTaskSearch] = useState('');
   const [formError, setFormError] = useState('');
+  const [isTaskSectionExpanded, setIsTaskSectionExpanded] = useState(true);
+
+  // Available obligations (Fiscal standard + custom)
+  const assignableObligations = useMemo(() => {
+    return getAvailableAssignableObligations(tasks, clients);
+  }, [tasks, clients]);
 
   if (!isOpen) return null;
 
@@ -52,8 +81,21 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
     setName('');
     setNif('');
     setNotes('');
+    // By default for a new client in an accounting firm, we can pre-select the standard monthly obligations
+    // or let them choose presets
+    setSelectedTaskKeys([
+      'series_fiscal_saft',
+      'series_fiscal_dmr',
+      'series_fiscal_dri',
+      'series_fiscal_tsu',
+      'series_fiscal_retencoes',
+      'series_fiscal_iva_mensal_declaracao',
+      'series_fiscal_iva_mensal_pagamento',
+    ]);
+    setTaskSearch('');
     setFormError('');
     setIsAddingNew(true);
+    setIsTaskSectionExpanded(true);
   };
 
   const handleStartEdit = (client: Client) => {
@@ -62,7 +104,64 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
     setName(client.name);
     setNif(client.nif || '');
     setNotes(client.notes || '');
+    const currentKeys = getClientAssignedTaskKeys(client.id, tasks, client);
+    setSelectedTaskKeys(currentKeys);
+    setTaskSearch('');
     setFormError('');
+    setIsTaskSectionExpanded(true);
+  };
+
+  const toggleTaskKey = (key: string) => {
+    setSelectedTaskKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
+
+  // Preset Selection Handlers
+  const applyPreset = (presetType: 'geral_salarios' | 'trimestral_salarios' | 'apenas_saft' | 'todas_mensais' | 'limpar') => {
+    if (presetType === 'limpar') {
+      setSelectedTaskKeys([]);
+      return;
+    }
+
+    if (presetType === 'todas_mensais') {
+      const monthlyKeys = assignableObligations
+        .filter((o) => o.recurrence === 'monthly')
+        .map((o) => o.id);
+      setSelectedTaskKeys(monthlyKeys);
+      return;
+    }
+
+    if (presetType === 'geral_salarios') {
+      setSelectedTaskKeys([
+        'series_fiscal_saft',
+        'series_fiscal_dmr',
+        'series_fiscal_dri',
+        'series_fiscal_tsu',
+        'series_fiscal_retencoes',
+        'series_fiscal_iva_mensal_declaracao',
+        'series_fiscal_iva_mensal_pagamento',
+      ]);
+      return;
+    }
+
+    if (presetType === 'trimestral_salarios') {
+      setSelectedTaskKeys([
+        'series_fiscal_saft',
+        'series_fiscal_dmr',
+        'series_fiscal_dri',
+        'series_fiscal_tsu',
+        'series_fiscal_retencoes',
+        'series_fiscal_iva_trimestral_declaracao',
+        'series_fiscal_iva_trimestral_pagamento',
+      ]);
+      return;
+    }
+
+    if (presetType === 'apenas_saft') {
+      setSelectedTaskKeys(['series_fiscal_saft']);
+      return;
+    }
   };
 
   const handleSaveForm = (e: React.FormEvent) => {
@@ -73,26 +172,35 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
     }
 
     if (editingClient) {
-      onUpdateClient({
-        ...editingClient,
-        name: name.trim(),
-        nif: nif.trim() || undefined,
-        notes: notes.trim() || undefined,
-      });
+      onUpdateClient(
+        {
+          ...editingClient,
+          name: name.trim(),
+          nif: nif.trim() || undefined,
+          notes: notes.trim() || undefined,
+          assignedTasks: selectedTaskKeys,
+        },
+        selectedTaskKeys
+      );
       setEditingClient(null);
     } else {
-      onAddClient({
-        name: name.trim(),
-        nif: nif.trim() || undefined,
-        notes: notes.trim() || undefined,
-        archived: false,
-      });
+      onAddClient(
+        {
+          name: name.trim(),
+          nif: nif.trim() || undefined,
+          notes: notes.trim() || undefined,
+          archived: false,
+          assignedTasks: selectedTaskKeys,
+        },
+        selectedTaskKeys
+      );
       setIsAddingNew(false);
     }
 
     setName('');
     setNif('');
     setNotes('');
+    setSelectedTaskKeys([]);
     setFormError('');
   };
 
@@ -113,6 +221,18 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
     }
   }
 
+  // Filter assignable obligations inside form
+  const filteredObligations = assignableObligations.filter((o) => {
+    if (!taskSearch) return true;
+    const q = taskSearch.toLowerCase();
+    return (
+      o.title.toLowerCase().includes(q) ||
+      (o.category && o.category.toLowerCase().includes(q)) ||
+      (o.legalEntity && o.legalEntity.toLowerCase().includes(q)) ||
+      (o.description && o.description.toLowerCase().includes(q))
+    );
+  });
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto"
@@ -120,21 +240,21 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
       aria-modal="true"
     >
       <div
-        className="w-full max-w-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden my-auto"
+        className="w-full max-w-4xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col max-h-[94vh] overflow-hidden my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 bg-slate-50/70 dark:bg-slate-800/40">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <Building2 className="w-4 h-4" />
+            <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-xs">
+              <Building2 className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Gestão de Empresas e Clientes
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Registo central de clientes do gabinete para associação rápida em tarefas.
+                Registo de clientes com associação automática de tarefas para todos os meses do ano.
               </p>
             </div>
           </div>
@@ -191,28 +311,37 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
           {(isAddingNew || editingClient) && (
             <form
               onSubmit={handleSaveForm}
-              className="p-4 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/60 rounded-xl space-y-3 animate-in fade-in duration-150"
+              className="p-4 sm:p-5 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/60 rounded-xl space-y-4 animate-in fade-in duration-150"
             >
-              <div className="flex items-center justify-between pb-2 border-b border-blue-100 dark:border-blue-900/40">
-                <span className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
-                  {editingClient ? 'Editar Cliente' : 'Registar Novo Cliente'}
-                </span>
+              <div className="flex items-center justify-between pb-3 border-b border-blue-100 dark:border-blue-900/40">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+                    {editingClient ? '✓' : '+'}
+                  </div>
+                  <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">
+                    {editingClient ? `Editar Cliente: ${editingClient.name}` : 'Registar Novo Cliente com Tarefas Recorrentes'}
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
                     setIsAddingNew(false);
                     setEditingClient(null);
                   }}
-                  className="text-xs text-slate-400 hover:text-slate-600"
+                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-medium"
                 >
                   Cancelar
                 </button>
               </div>
 
               {formError && (
-                <div className="p-2 text-xs rounded bg-rose-100 text-rose-800">{formError}</div>
+                <div className="p-2.5 text-xs rounded-lg bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-900 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
               )}
 
+              {/* Basic Fields */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -223,7 +352,7 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Ex.: Silva & Filhos Lda."
+                    placeholder="Ex.: Silva & Santos Lda."
                     className="w-full text-xs sm:text-sm px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -250,27 +379,207 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ex.: Regime mensal IVA, 4 funcionários, contacto: Dr. Silva..."
+                  placeholder="Ex.: Regime mensal IVA, 5 colaboradores, contacto Dr. Silva..."
                   className="w-full text-xs sm:text-sm px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-2">
+              {/* Task Association Section: "ficam para todos os meses" */}
+              <div className="pt-2 border-t border-blue-100 dark:border-blue-900/40">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                      Tarefas e Obrigações a Associar (ficam para todos os meses)
+                    </span>
+                    <span className="px-2 py-0.5 text-[11px] font-bold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded-full">
+                      {selectedTaskKeys.length} selecionadas
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsTaskSectionExpanded(!isTaskSectionExpanded)}
+                    className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs flex items-center gap-1"
+                  >
+                    {isTaskSectionExpanded ? (
+                      <>
+                        <span>Recolher</span>
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      </>
+                    ) : (
+                      <>
+                        <span>Expandir</span>
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Subtitle explanation */}
+                <div className="flex items-start gap-2 p-2.5 bg-blue-100/60 dark:bg-blue-900/30 rounded-lg text-xs text-blue-900 dark:text-blue-200 mb-3">
+                  <Info className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
+                  <p>
+                    As tarefas selecionadas ficarão <strong>automaticamente associadas a este cliente em todos os meses</strong> (Janeiro a Dezembro e meses futuros). No calendário e na lista de tarefas, este cliente aparecerá incluído em cada uma dessas obrigações.
+                  </p>
+                </div>
+
+                {isTaskSectionExpanded && (
+                  <div className="space-y-3">
+                    {/* Presets and Filter */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mr-1 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-500" />
+                          Predefinições:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('geral_salarios')}
+                          className="px-2.5 py-1 text-[11px] font-medium bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-md shadow-2xs"
+                        >
+                          Regime Geral + Salários
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('trimestral_salarios')}
+                          className="px-2.5 py-1 text-[11px] font-medium bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-md shadow-2xs"
+                        >
+                          Regime Trimestral + Salários
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('todas_mensais')}
+                          className="px-2.5 py-1 text-[11px] font-medium bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-md shadow-2xs"
+                        >
+                          Todas as Mensais
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('apenas_saft')}
+                          className="px-2.5 py-1 text-[11px] font-medium bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-md shadow-2xs"
+                        >
+                          Só SAF-T
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('limpar')}
+                          className="px-2 py-1 text-[11px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                        >
+                          Limpar
+                        </button>
+                      </div>
+
+                      {/* Obligation search */}
+                      <div className="relative w-full sm:w-48">
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Filtrar tarefas..."
+                          value={taskSearch}
+                          onChange={(e) => setTaskSearch(e.target.value)}
+                          className="w-full text-xs pl-8 pr-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Obligations Checklist */}
+                    <div className="border border-slate-200 dark:border-slate-700 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 max-h-56 overflow-y-auto bg-white dark:bg-slate-900">
+                      {filteredObligations.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-slate-400">
+                          Nenhuma obrigação encontrada com o termo pesquisado.
+                        </div>
+                      ) : (
+                        filteredObligations.map((ob) => {
+                          const isChecked = selectedTaskKeys.includes(ob.id);
+
+                          return (
+                            <label
+                              key={ob.id}
+                              className={`p-2.5 flex items-start gap-3 cursor-pointer transition-colors ${
+                                isChecked
+                                  ? 'bg-blue-50/70 dark:bg-blue-950/40'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                              }`}
+                            >
+                              <div className="pt-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleTaskKey(ob.id)}
+                                  className="w-4 h-4 rounded text-blue-600 border-slate-300 dark:border-slate-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`text-xs font-semibold ${
+                                    isChecked
+                                      ? 'text-blue-950 dark:text-blue-100 font-bold'
+                                      : 'text-slate-800 dark:text-slate-200'
+                                  }`}>
+                                    {ob.title}
+                                  </span>
+
+                                  {/* Periodicity Badge */}
+                                  <span className="px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-700">
+                                    {ob.periodicityLabel}
+                                  </span>
+
+                                  {/* Legal Entity / Category */}
+                                  {ob.legalEntity && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 rounded border border-amber-200 dark:border-amber-900/50">
+                                      {ob.legalEntity}
+                                    </span>
+                                  )}
+                                  {ob.category && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-medium bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-400 rounded">
+                                      {ob.category}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {ob.description && (
+                                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                                    {ob.description}
+                                  </p>
+                                )}
+                              </div>
+
+                              {ob.assignedClientsCount > 0 && (
+                                <span className="text-[10px] text-slate-400 shrink-0 self-center">
+                                  {ob.assignedClientsCount} {ob.assignedClientsCount === 1 ? 'cliente' : 'clientes'}
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Submit / Cancel Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-blue-100 dark:border-blue-900/40">
                 <button
                   type="button"
                   onClick={() => {
                     setIsAddingNew(false);
                     setEditingClient(null);
                   }}
-                  className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-800"
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs"
+                  className="px-5 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs flex items-center gap-1.5"
                 >
-                  {editingClient ? 'Guardar Alterações' : 'Adicionar Cliente'}
+                  <Check className="w-4 h-4" />
+                  <span>
+                    {editingClient ? 'Guardar Alterações e Atualizar Meses' : 'Adicionar Cliente com Tarefas'}
+                  </span>
                 </button>
               </div>
             </form>
@@ -288,15 +597,30 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
               </div>
             ) : (
               filteredClients.map((client) => {
+                const assignedKeys = getClientAssignedTaskKeys(client.id, tasks, client);
                 const taskCount = clientTaskCounts.get(client.id) || 0;
+
+                // Find human-friendly names for assigned obligations
+                const assignedNames = assignedKeys
+                  .map((key) => {
+                    const ob = assignableObligations.find((o) => o.id === key);
+                    if (ob) return ob.title;
+                    if (key.startsWith('series_fiscal_')) {
+                      return key.replace('series_fiscal_', '').toUpperCase();
+                    }
+                    return key;
+                  })
+                  .slice(0, 4);
+
+                const remainingCount = Math.max(0, assignedKeys.length - 4);
 
                 return (
                   <div
                     key={client.id}
                     className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
                   >
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-1.5 min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold text-sm text-slate-900 dark:text-white">
                           {client.name}
                         </span>
@@ -318,8 +642,34 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                         </p>
                       )}
 
-                      <div className="text-[11px] text-slate-400">
-                        Associado a {taskCount} {taskCount === 1 ? 'tarefa' : 'tarefas'}
+                      {/* Badges of Assigned Recurring Obligations */}
+                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-medium mr-1">
+                          <Layers className="w-3 h-3 text-blue-500" />
+                          {assignedKeys.length} {assignedKeys.length === 1 ? 'obrigação mensal' : 'obrigações mensais'}:
+                        </span>
+
+                        {assignedNames.map((nameStr, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 rounded-md border border-blue-200 dark:border-blue-900/60 max-w-[200px] truncate"
+                            title={nameStr}
+                          >
+                            {nameStr}
+                          </span>
+                        ))}
+
+                        {remainingCount > 0 && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-md">
+                            +{remainingCount} outras
+                          </span>
+                        )}
+
+                        {assignedKeys.length === 0 && (
+                          <span className="text-[11px] text-slate-400 italic">
+                            Sem tarefas associadas (clique no lápis para associar)
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -328,10 +678,11 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleStartEdit(client)}
-                        className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                        title="Editar cliente"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-lg transition-colors border border-slate-200 dark:border-slate-700"
+                        title="Editar cliente e suas tarefas recorrentes"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Editar</span>
                       </button>
 
                       <button
@@ -364,7 +715,10 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end bg-slate-50/70 dark:bg-slate-800/40">
+        <div className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50/70 dark:bg-slate-800/40">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Total de {clients.length} {clients.length === 1 ? 'empresa/cliente' : 'empresas/clientes'} no gabinete
+          </div>
           <button
             type="button"
             onClick={onClose}

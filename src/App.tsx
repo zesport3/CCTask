@@ -32,6 +32,7 @@ import {
   generateFiscalTasksForMonth,
   FiscalObligationDefinition,
 } from './utils/fiscalCalendar';
+import { applyClientObligationsToTasks } from './utils/clientTaskUtils';
 
 export default function App() {
   // Application Data State
@@ -96,7 +97,30 @@ export default function App() {
   // Initial Load from LocalStorage
   useEffect(() => {
     const { tasks: loadedTasks, clients: loadedClients } = loadAppData();
-    setTasks(loadedTasks);
+    // Ensure TSU is migrated to day 25 across all loaded tasks
+    const migratedTasks = loadedTasks.map((t) => {
+      const isTsu =
+        t.recurrenceSeriesId === 'series_fiscal_tsu' ||
+        t.title.toLowerCase().includes('pagamento da tsu');
+      if (isTsu && (t.nominalDay === 20 || t.date.endsWith('-20') || t.date.endsWith('-21') || t.date.endsWith('-22'))) {
+        const [yStr, mStr] = t.date.split('-');
+        const y = parseInt(yStr, 10);
+        const m = parseInt(mStr, 10) - 1;
+        const maxDays = new Date(y, m + 1, 0).getDate();
+        const safeDay = Math.min(25, maxDays);
+        const nominalIso = `${y}-${String(m + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
+        const adj = adjustToNextBusinessDay(nominalIso);
+        return {
+          ...t,
+          nominalDay: 25,
+          nominalDate: nominalIso,
+          date: adj.businessDayDate,
+        };
+      }
+      return t;
+    });
+
+    setTasks(migratedTasks);
     setClients(loadedClients);
     setIsLoaded(true);
   }, []);
@@ -171,39 +195,128 @@ export default function App() {
     const nowIso = new Date().toISOString();
 
     if (editTaskId) {
-      // Update existing task
-      setTasks((prev) => {
-        const updated = prev.map((t) =>
-          t.id === editTaskId
-            ? {
+      // Find the task being edited
+      const existingTask = tasks.find((t) => t.id === editTaskId);
+      const isRecurring =
+        Boolean(existingTask?.recurrenceSeriesId) ||
+        existingTask?.recurrence === 'monthly' ||
+        taskData.recurrence === 'monthly';
+
+      if (isRecurring) {
+        const targetSeriesId =
+          existingTask?.recurrenceSeriesId ||
+          taskData.recurrenceSeriesId ||
+          (existingTask ? `series_${existingTask.title.trim().toLowerCase()}` : `series_${Date.now()}`);
+
+        const newNominalDay =
+          taskData.nominalDay ||
+          (taskData.date ? parseInt(taskData.date.split('-')[2], 10) : 25);
+
+        setTasks((prev) => {
+          const updated = prev.map((t) => {
+            const matchesSeries =
+              (targetSeriesId && t.recurrenceSeriesId === targetSeriesId) ||
+              (existingTask &&
+                t.title.trim().toLowerCase() === existingTask.title.trim().toLowerCase() &&
+                t.recurrence === existingTask.recurrence) ||
+              t.id === editTaskId;
+
+            if (matchesSeries) {
+              const [yStr, mStr] = t.date.split('-');
+              const y = parseInt(yStr, 10);
+              const m = parseInt(mStr, 10) - 1;
+              const maxDays = new Date(y, m + 1, 0).getDate();
+              const safeDay = Math.min(newNominalDay, maxDays);
+              const nominalIso = `${y}-${String(m + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
+              const adj = adjustToNextBusinessDay(nominalIso);
+
+              return {
                 ...t,
-                ...taskData,
+                title: taskData.title,
+                description: taskData.description,
+                generalNotes: taskData.generalNotes,
+                recurrence: taskData.recurrence,
+                recurrenceSeriesId: targetSeriesId,
+                nominalDay: newNominalDay,
+                nominalDate: nominalIso,
+                date: adj.businessDayDate,
+                clients: taskData.clients,
                 updatedAt: nowIso,
-              }
-            : t
-        );
-        const { tasks: synced } = syncRecurringTasks(updated, currentYear, currentMonth);
-        return synced;
-      });
+              };
+            }
+            return t;
+          });
+          const { tasks: synced } = syncRecurringTasks(updated, currentYear, currentMonth);
+          return synced;
+        });
+      } else {
+        // Non-recurring single task
+        setTasks((prev) => {
+          const updated = prev.map((t) =>
+            t.id === editTaskId
+              ? {
+                  ...t,
+                  ...taskData,
+                  updatedAt: nowIso,
+                }
+              : t
+          );
+          return updated;
+        });
+      }
     } else {
       // Create new task
       const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const seriesId = taskData.recurrenceSeriesId || (taskData.recurrence === 'monthly' ? taskId : undefined);
-      const newTask: AccountingTask = {
-        ...taskData,
-        id: taskId,
-        recurrenceSeriesId: seriesId,
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      };
 
-      setTasks((prev) => {
-        const list = [...prev, newTask];
-        const { tasks: synced } = syncRecurringTasks(list, currentYear, currentMonth);
-        return synced;
-      });
+      if (taskData.recurrence === 'monthly') {
+        // Generate for all 12 months of the current year so it's in ALL months always!
+        const newNominalDay =
+          taskData.nominalDay ||
+          (taskData.date ? parseInt(taskData.date.split('-')[2], 10) : 1);
 
-      // Automatically select the date or ensure view contains the created task
+        const yearTasks: AccountingTask[] = [];
+        for (let m = 0; m < 12; m++) {
+          const monthStr = String(m + 1).padStart(2, '0');
+          const maxDays = new Date(currentYear, m + 1, 0).getDate();
+          const safeDay = Math.min(newNominalDay, maxDays);
+          const nominalIso = `${currentYear}-${monthStr}-${String(safeDay).padStart(2, '0')}`;
+          const adj = adjustToNextBusinessDay(nominalIso);
+
+          yearTasks.push({
+            ...taskData,
+            id: `task_${seriesId}_${currentYear}_${monthStr}`,
+            date: adj.businessDayDate,
+            nominalDay: newNominalDay,
+            nominalDate: nominalIso,
+            periodLabel: `${PT_MONTHS[m]} de ${currentYear}`,
+            recurrence: 'monthly',
+            recurrenceSeriesId: seriesId,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          });
+        }
+
+        setTasks((prev) => {
+          const combined = [...prev, ...yearTasks];
+          const { tasks: synced } = syncRecurringTasks(combined, currentYear, currentMonth);
+          return synced;
+        });
+      } else {
+        const newTask: AccountingTask = {
+          ...taskData,
+          id: taskId,
+          recurrenceSeriesId: seriesId,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+        setTasks((prev) => {
+          const list = [...prev, newTask];
+          const { tasks: synced } = syncRecurringTasks(list, currentYear, currentMonth);
+          return synced;
+        });
+      }
+
       if (taskData.date) {
         const [yStr, mStr] = taskData.date.split('-');
         const y = parseInt(yStr, 10);
@@ -340,16 +453,18 @@ export default function App() {
     }
   };
 
-  // Restore/Populate Official Portuguese Accounting Fiscal Calendar
+  // Restore/Populate Official Portuguese Accounting Fiscal Calendar across all months
   const handleRestoreFiscalCalendar = () => {
-    const fiscalTasks = generateFiscalTasksForMonth(currentYear, currentMonth);
     setTasks((prev) => {
-      const existingKeys = new Set(prev.map((t) => `${t.title.toLowerCase().trim()}_${t.date}`));
-      const merged = [...prev];
-      for (const ft of fiscalTasks) {
-        const key = `${ft.title.toLowerCase().trim()}_${ft.date}`;
-        if (!existingKeys.has(key)) {
-          merged.push(ft);
+      let merged = [...prev];
+      for (let m = 0; m < 12; m++) {
+        const fiscalTasks = generateFiscalTasksForMonth(currentYear, m);
+        const existingKeys = new Set(merged.map((t) => `${t.title.toLowerCase().trim()}_${t.date}`));
+        for (const ft of fiscalTasks) {
+          const key = `${ft.title.toLowerCase().trim()}_${ft.date}`;
+          if (!existingKeys.has(key)) {
+            merged.push(ft);
+          }
         }
       }
       const { tasks: synced } = syncRecurringTasks(merged, currentYear, currentMonth);
@@ -357,37 +472,132 @@ export default function App() {
     });
   };
 
-  // Add a single obligation from Fiscal Calendar modal
+  // Add a single obligation from Fiscal Calendar modal across all months
   const handleAddSingleFiscalTask = (def: FiscalObligationDefinition) => {
-    const monthStr = String(currentMonth + 1).padStart(2, '0');
-    const monthName = PT_MONTHS[currentMonth];
-    const maxDays = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const safeNominalDay = Math.min(def.nominalDay, maxDays);
-    const nominalDate = `${currentYear}-${monthStr}-${String(safeNominalDay).padStart(2, '0')}`;
-    const adjustment = adjustToNextBusinessDay(nominalDate);
-    const effectiveDate = adjustment.businessDayDate;
     const nowIso = new Date().toISOString();
+    const monthsToCreate =
+      def.recurrence === 'monthly'
+        ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        : def.recurrence === 'quarterly'
+        ? def.quarterlyMonths || [1, 4, 7, 10]
+        : [def.annualMonth ?? 4];
 
-    const newTask: AccountingTask = {
-      id: `${def.id}_${currentYear}_${monthStr}_${Date.now()}`,
-      title: def.title,
-      description: def.description,
-      date: effectiveDate,
-      generalNotes: `${def.notes}\n\nEntidade: ${def.legalEntity} · Categoria: ${def.category}`,
-      clients: [],
-      isCompleted: false,
-      recurrence: def.recurrence,
-      recurrenceSeriesId: def.seriesId,
-      nominalDay: def.nominalDay,
-      nominalDate: nominalDate,
-      periodLabel: `${monthName} de ${currentYear}`,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    };
+    const newTasks: AccountingTask[] = [];
+    for (const m of monthsToCreate) {
+      const monthStr = String(m + 1).padStart(2, '0');
+      const monthName = PT_MONTHS[m];
+      const maxDays = new Date(currentYear, m + 1, 0).getDate();
+      const safeNominalDay = Math.min(def.nominalDay, maxDays);
+      const nominalDate = `${currentYear}-${monthStr}-${String(safeNominalDay).padStart(2, '0')}`;
+      const adjustment = adjustToNextBusinessDay(nominalDate);
+
+      newTasks.push({
+        id: `${def.id}_${currentYear}_${monthStr}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+        title: def.title,
+        description: def.description,
+        date: adjustment.businessDayDate,
+        generalNotes: `${def.notes}\n\nEntidade: ${def.legalEntity} · Categoria: ${def.category}`,
+        clients: [],
+        isCompleted: false,
+        recurrence: def.recurrence,
+        recurrenceSeriesId: def.seriesId,
+        nominalDay: def.nominalDay,
+        nominalDate: nominalDate,
+        periodLabel: `${monthName} de ${currentYear}`,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
+    }
 
     setTasks((prev) => {
-      const list = [...prev, newTask];
+      // Remove any existing duplicate occurrences of this series
+      const filtered = prev.filter(
+        (t) =>
+          t.recurrenceSeriesId !== def.seriesId &&
+          t.title.trim().toLowerCase() !== def.title.trim().toLowerCase()
+      );
+      const list = [...filtered, ...newTasks];
       const { tasks: synced } = syncRecurringTasks(list, currentYear, currentMonth);
+      return synced;
+    });
+  };
+
+  // Update a fiscal obligation definition and propagate changes to ALL months
+  const handleUpdateFiscalObligation = (def: FiscalObligationDefinition) => {
+    const nowIso = new Date().toISOString();
+    setTasks((prev) => {
+      const hasExisting = prev.some(
+        (t) =>
+          t.recurrenceSeriesId === def.seriesId ||
+          t.title.trim().toLowerCase() === def.title.trim().toLowerCase()
+      );
+
+      let updated = prev.map((t) => {
+        const matches =
+          t.recurrenceSeriesId === def.seriesId ||
+          t.title.trim().toLowerCase() === def.title.trim().toLowerCase();
+
+        if (matches) {
+          const [yStr, mStr] = t.date.split('-');
+          const y = parseInt(yStr, 10);
+          const m = parseInt(mStr, 10) - 1;
+          const maxDays = new Date(y, m + 1, 0).getDate();
+          const safeNominalDay = Math.min(def.nominalDay, maxDays);
+          const nominalDate = `${y}-${String(m + 1).padStart(2, '0')}-${String(safeNominalDay).padStart(2, '0')}`;
+          const adj = adjustToNextBusinessDay(nominalDate);
+
+          return {
+            ...t,
+            title: def.title,
+            description: def.description,
+            generalNotes: `${def.notes}\n\nEntidade: ${def.legalEntity} · Categoria: ${def.category}`,
+            recurrence: def.recurrence,
+            recurrenceSeriesId: def.seriesId,
+            nominalDay: def.nominalDay,
+            nominalDate: nominalDate,
+            date: adj.businessDayDate,
+            updatedAt: nowIso,
+          };
+        }
+        return t;
+      });
+
+      if (!hasExisting) {
+        // If not present yet, instantiate for all months
+        const monthsToCreate =
+          def.recurrence === 'monthly'
+            ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+            : def.recurrence === 'quarterly'
+            ? def.quarterlyMonths || [1, 4, 7, 10]
+            : [def.annualMonth ?? 4];
+
+        for (const m of monthsToCreate) {
+          const monthStr = String(m + 1).padStart(2, '0');
+          const maxDays = new Date(currentYear, m + 1, 0).getDate();
+          const safeNominalDay = Math.min(def.nominalDay, maxDays);
+          const nominalDate = `${currentYear}-${monthStr}-${String(safeNominalDay).padStart(2, '0')}`;
+          const adj = adjustToNextBusinessDay(nominalDate);
+
+          updated.push({
+            id: `${def.id}_${currentYear}_${monthStr}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+            title: def.title,
+            description: def.description,
+            date: adj.businessDayDate,
+            generalNotes: `${def.notes}\n\nEntidade: ${def.legalEntity} · Categoria: ${def.category}`,
+            clients: [],
+            isCompleted: false,
+            recurrence: def.recurrence,
+            recurrenceSeriesId: def.seriesId,
+            nominalDay: def.nominalDay,
+            nominalDate: nominalDate,
+            periodLabel: `${PT_MONTHS[m]} de ${currentYear}`,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          });
+        }
+      }
+
+      const { tasks: synced } = syncRecurringTasks(updated, currentYear, currentMonth);
       return synced;
     });
   };
@@ -468,31 +678,55 @@ export default function App() {
     return newClient;
   };
 
-  const handleAddClient = (clientData: Omit<Client, 'id' | 'createdAt'>) => {
+  const handleAddClient = (
+    clientData: Omit<Client, 'id' | 'createdAt'>,
+    selectedTaskKeys: string[] = []
+  ) => {
     const newClient: Client = {
       ...clientData,
       id: `cli_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      assignedTasks: selectedTaskKeys,
       createdAt: new Date().toISOString(),
     };
+
     setClients((prev) => [...prev, newClient]);
+
+    if (selectedTaskKeys && selectedTaskKeys.length > 0) {
+      setTasks((prevTasks) => {
+        return applyClientObligationsToTasks(
+          prevTasks,
+          newClient,
+          selectedTaskKeys,
+          currentYear,
+          currentMonth
+        );
+      });
+    }
   };
 
-  const handleUpdateClient = (updatedClient: Client) => {
-    setClients((prev) => prev.map((c) => (c.id === updatedClient.id ? updatedClient : c)));
-    setTasks((prev) =>
-      prev.map((t) => ({
-        ...t,
-        clients: t.clients.map((tc) =>
-          tc.clientId === updatedClient.id
-            ? {
-                ...tc,
-                clientName: updatedClient.name,
-                clientNif: updatedClient.nif,
-              }
-            : tc
-        ),
-      }))
+  const handleUpdateClient = (
+    updatedClient: Client,
+    selectedTaskKeys?: string[]
+  ) => {
+    const tasksToApply = selectedTaskKeys ?? updatedClient.assignedTasks ?? [];
+    const clientWithTasks: Client = {
+      ...updatedClient,
+      assignedTasks: tasksToApply,
+    };
+
+    setClients((prev) =>
+      prev.map((c) => (c.id === updatedClient.id ? clientWithTasks : c))
     );
+
+    setTasks((prevTasks) => {
+      return applyClientObligationsToTasks(
+        prevTasks,
+        clientWithTasks,
+        tasksToApply,
+        currentYear,
+        currentMonth
+      );
+    });
   };
 
   const handleToggleArchiveClient = (clientId: string) => {
@@ -693,6 +927,7 @@ export default function App() {
         currentTasks={tasks}
         onLoadAllFiscalTasks={handleRestoreFiscalCalendar}
         onAddSingleFiscalTask={handleAddSingleFiscalTask}
+        onUpdateFiscalObligation={handleUpdateFiscalObligation}
       />
 
       {/* 2. Painel de Detalhes da Tarefa */}

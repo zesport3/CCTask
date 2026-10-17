@@ -187,12 +187,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 Data limite: {formatDatePT(task.date)}
               </span>
 
-              {task.nominalDay && parseInt(task.date.split('-')[2], 10) !== task.nominalDay && (
-                <span className="text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900/50">
-                  Ajustado do dia {task.nominalDay} (calhou a feriado ou fim de semana)
-                </span>
-              )}
-
               {task.recurrence && task.recurrence !== 'none' && (
                 <span className="inline-flex items-center gap-1.5 text-slate-500">
                   <Repeat className="w-4 h-4 text-slate-400" />

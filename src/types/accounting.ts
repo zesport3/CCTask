@@ -6,6 +6,7 @@ export interface Client {
   nif?: string;
   notes?: string;
   archived?: boolean;
+  assignedTasks?: string[];
   createdAt: string;
 }
 

@@ -527,20 +527,18 @@ const UniqueTaskRowCard: React.FC<UniqueTaskRowCardProps> = ({
                   {item.isRecurring ? 'Próximo vencimento:' : 'Data de vencimento:'}{' '}
                   <strong className="font-semibold">{formatDatePT(item.nextDate)}</strong>
                 </span>
-
-                {item.wasAdjusted && (
-                  <span className="text-[11px] px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/60">
-                    Ajustado do dia {item.nominalDay} (próximo dia útil após fim de semana ou feriado)
-                  </span>
-                )}
               </div>
             )}
 
             {/* Clients note if applicable */}
             {item.clients.length > 0 && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                Empresas associadas: {item.clients.map((c) => c.clientName).join(', ')}
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                <span>
+                  {item.clients.length} {item.clients.length === 1 ? 'empresa associada' : 'empresas associadas'}:{' '}
+                  {item.clients.slice(0, 3).map((c) => c.clientName).join(', ')}
+                  {item.clients.length > 3 ? ` e mais ${item.clients.length - 3}` : ''}
+                </span>
               </span>
             )}
           </div>

@@ -56,12 +56,12 @@ export const FISCAL_OBLIGATIONS: FiscalObligationDefinition[] = [
     id: 'fiscal_tsu',
     seriesId: 'series_fiscal_tsu',
     title: 'Pagamento da TSU (Segurança Social)',
-    nominalDay: 20,
+    nominalDay: 25,
     recurrence: 'monthly',
     legalEntity: 'Segurança Social',
     category: 'Segurança Social',
     description: 'Pagamento das contribuições e cotizações para a Segurança Social (Taxa Social Única) referentes ao mês anterior.',
-    notes: 'Prazo legal: entre o dia 10 e o dia 20 de cada mês.',
+    notes: 'Prazo legal: até ao dia 25 de cada mês.',
   },
   {
     id: 'fiscal_retencoes',
@@ -168,6 +168,67 @@ export const FISCAL_OBLIGATIONS: FiscalObligationDefinition[] = [
   },
 ];
 
+const CUSTOM_FISCAL_KEY = 'contab_custom_fiscal_obligations_v1';
+
+/**
+ * Returns all active fiscal obligations, combining standard ones with any user customizations/additions.
+ */
+export function getFiscalObligations(): FiscalObligationDefinition[] {
+  try {
+    const stored = localStorage.getItem(CUSTOM_FISCAL_KEY);
+    if (!stored) return FISCAL_OBLIGATIONS;
+    const customList: FiscalObligationDefinition[] = JSON.parse(stored);
+    if (!Array.isArray(customList) || customList.length === 0) return FISCAL_OBLIGATIONS;
+
+    // Merge: custom items override or add to standard items
+    const map = new Map<string, FiscalObligationDefinition>();
+    for (const def of FISCAL_OBLIGATIONS) {
+      map.set(def.seriesId, def);
+    }
+    for (const custom of customList) {
+      map.set(custom.seriesId, custom);
+    }
+    return Array.from(map.values());
+  } catch {
+    return FISCAL_OBLIGATIONS;
+  }
+}
+
+/**
+ * Saves a new or modified fiscal obligation definition to local storage.
+ */
+export function saveFiscalObligation(def: FiscalObligationDefinition): void {
+  try {
+    const current = getFiscalObligations();
+    const existingIndex = current.findIndex(
+      (o) => o.id === def.id || o.seriesId === def.seriesId
+    );
+    let updated: FiscalObligationDefinition[];
+    if (existingIndex >= 0) {
+      updated = [...current];
+      updated[existingIndex] = def;
+    } else {
+      updated = [...current, def];
+    }
+    localStorage.setItem(CUSTOM_FISCAL_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Failed to save fiscal obligation', err);
+  }
+}
+
+/**
+ * Deletes a custom fiscal obligation.
+ */
+export function deleteFiscalObligation(seriesId: string): void {
+  try {
+    const current = getFiscalObligations();
+    const filtered = current.filter((o) => o.seriesId !== seriesId && o.id !== seriesId);
+    localStorage.setItem(CUSTOM_FISCAL_KEY, JSON.stringify(filtered));
+  } catch (err) {
+    console.error('Failed to delete fiscal obligation', err);
+  }
+}
+
 /**
  * Builds standard pre-defined AccountingTask objects for the specified year and month,
  * strictly applying the weekend and holiday rules (shifting to next business day while retaining nominalDay).
@@ -179,8 +240,9 @@ export function generateFiscalTasksForMonth(year: number, month: number): Accoun
   const nowIso = new Date().toISOString();
 
   const generated: AccountingTask[] = [];
+  const obligations = getFiscalObligations();
 
-  for (const def of FISCAL_OBLIGATIONS) {
+  for (const def of obligations) {
     // Check if obligation applies to this month
     if (def.recurrence === 'quarterly') {
       const qMonths = def.quarterlyMonths || [1, 4, 7, 10];
