@@ -1,0 +1,762 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Calendar as CalendarIcon,
+  ListTodo,
+  Sparkles,
+  Plus,
+} from 'lucide-react';
+import { Navbar } from './components/Navbar';
+import { CalendarMonth } from './components/CalendarMonth';
+import { TaskList } from './components/TaskList';
+import { AllTasksView } from './components/AllTasksView';
+import { FiscalCalendarModal } from './components/FiscalCalendarModal';
+import { TaskDetailModal } from './components/TaskDetailModal';
+import { TaskFormModal } from './components/TaskFormModal';
+import { ClientManagerModal } from './components/ClientManagerModal';
+import { BackupModal } from './components/BackupModal';
+import { ConfirmDialog } from './components/ConfirmDialog';
+
+import { AccountingTask, Client, AppBackupData, ClientTaskStatus } from './types/accounting';
+import {
+  loadAppData,
+  saveAppData,
+} from './utils/storage';
+import {
+  calculateNextOccurrence,
+  formatDatePT,
+  syncRecurringTasks,
+  adjustToNextBusinessDay,
+  PT_MONTHS,
+} from './utils/dateUtils';
+import {
+  generateFiscalTasksForMonth,
+  FiscalObligationDefinition,
+} from './utils/fiscalCalendar';
+
+export default function App() {
+  // Application Data State
+  const [tasks, setTasks] = useState<AccountingTask[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<{
+    success: boolean;
+    lastSaved?: Date;
+    error?: string;
+  }>({ success: true });
+
+  // Active View Tab: 'calendar' or 'all_tasks' (Aba para ver as tarefas que tenho criadas)
+  const [activeTab, setActiveTab] = useState<'calendar' | 'all_tasks'>('calendar');
+
+  // Calendar View State: Year and Month (0-11)
+  const [currentYear, setCurrentYear] = useState<number>(() => new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState<number>(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  // Modals and Active Selections
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<AccountingTask | null>(null);
+  const [presetTaskDate, setPresetTaskDate] = useState<string | undefined>(undefined);
+  const [isClientManagerOpen, setIsClientManagerOpen] = useState(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isFiscalCalendarOpen, setIsFiscalCalendarOpen] = useState(false);
+
+  // Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    isDestructive?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  // Dark Mode State
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('contab_theme_v1');
+    if (saved) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  // Apply dark mode class to html document
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('contab_theme_v1', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('contab_theme_v1', 'light');
+    }
+  }, [isDarkMode]);
+
+  // Initial Load from LocalStorage
+  useEffect(() => {
+    const { tasks: loadedTasks, clients: loadedClients } = loadAppData();
+    setTasks(loadedTasks);
+    setClients(loadedClients);
+    setIsLoaded(true);
+  }, []);
+
+  // Autosave to LocalStorage whenever tasks or clients change
+  useEffect(() => {
+    if (!isLoaded) return;
+    const res = saveAppData(tasks, clients);
+    if (res.success) {
+      setSaveStatus({ success: true, lastSaved: new Date() });
+    } else {
+      setSaveStatus({ success: false, error: res.error });
+    }
+  }, [tasks, clients, isLoaded]);
+
+  // Automatically synchronize monthly recurring tasks for upcoming months
+  useEffect(() => {
+    if (!isLoaded || tasks.length === 0) return;
+    const { tasks: synced, hasNew } = syncRecurringTasks(tasks, currentYear, currentMonth);
+    if (hasNew) {
+      setTasks(synced);
+    }
+  }, [currentYear, currentMonth, isLoaded, tasks]);
+
+  // Current task selected for details (reactive to tasks changes)
+  const activeDetailTask = tasks.find((t) => t.id === detailTaskId) || null;
+
+  // Navigation handlers
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear((y) => y - 1);
+    } else {
+      setCurrentMonth((m) => m - 1);
+    }
+    setSelectedDate(null);
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear((y) => y + 1);
+    } else {
+      setCurrentMonth((m) => m + 1);
+    }
+    setSelectedDate(null);
+  };
+
+  const handleCurrentMonth = () => {
+    const now = new Date();
+    setCurrentYear(now.getFullYear());
+    setCurrentMonth(now.getMonth());
+    setSelectedDate(null);
+  };
+
+  // Task Actions
+  const handleOpenNewTask = (presetDate?: string) => {
+    setEditingTask(null);
+    setPresetTaskDate(presetDate);
+    setIsTaskFormOpen(true);
+  };
+
+  const handleOpenEditTask = (taskToEdit: AccountingTask) => {
+    setEditingTask(taskToEdit);
+    setIsTaskFormOpen(true);
+  };
+
+  const handleSaveTask = (
+    taskData: Omit<AccountingTask, 'id' | 'createdAt' | 'updatedAt'>,
+    editTaskId?: string
+  ) => {
+    const nowIso = new Date().toISOString();
+
+    if (editTaskId) {
+      // Update existing task
+      setTasks((prev) => {
+        const updated = prev.map((t) =>
+          t.id === editTaskId
+            ? {
+                ...t,
+                ...taskData,
+                updatedAt: nowIso,
+              }
+            : t
+        );
+        const { tasks: synced } = syncRecurringTasks(updated, currentYear, currentMonth);
+        return synced;
+      });
+    } else {
+      // Create new task
+      const taskId = `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const seriesId = taskData.recurrenceSeriesId || (taskData.recurrence === 'monthly' ? taskId : undefined);
+      const newTask: AccountingTask = {
+        ...taskData,
+        id: taskId,
+        recurrenceSeriesId: seriesId,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+
+      setTasks((prev) => {
+        const list = [...prev, newTask];
+        const { tasks: synced } = syncRecurringTasks(list, currentYear, currentMonth);
+        return synced;
+      });
+
+      // Automatically select the date or ensure view contains the created task
+      if (taskData.date) {
+        const [yStr, mStr] = taskData.date.split('-');
+        const y = parseInt(yStr, 10);
+        const m = parseInt(mStr, 10) - 1;
+        setCurrentYear(y);
+        setCurrentMonth(m);
+      }
+    }
+  };
+
+  const handleUpdateTask = (updatedTask: AccountingTask) => {
+    setTasks((prev) => {
+      const updated = prev.map((t) => (t.id === updatedTask.id ? updatedTask : t));
+      const { tasks: synced } = syncRecurringTasks(updated, currentYear, currentMonth);
+      return synced;
+    });
+  };
+
+  // Quick inline date change (preserves and recalculates nominal day across series if recurring)
+  const handleQuickChangeDate = (task: AccountingTask, newDate: string) => {
+    const nowIso = new Date().toISOString();
+    const day = parseInt(newDate.split('-')[2], 10);
+    const seriesId = task.recurrenceSeriesId;
+    const isRecurring = Boolean(seriesId) || (task.recurrence && task.recurrence !== 'none');
+
+    if (isRecurring) {
+      setTasks((prev) =>
+        prev.map((t) => {
+          const matches =
+            (seriesId && t.recurrenceSeriesId === seriesId) ||
+            (t.title.trim().toLowerCase() === task.title.trim().toLowerCase() &&
+              t.recurrence === task.recurrence);
+
+          if (matches) {
+            const [yStr, mStr] = t.date.split('-');
+            const y = parseInt(yStr, 10);
+            const m = parseInt(mStr, 10) - 1;
+            const maxDays = new Date(y, m + 1, 0).getDate();
+            const safeDay = Math.min(day, maxDays);
+            const nominalIso = `${y}-${String(m + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
+            const adj = adjustToNextBusinessDay(nominalIso);
+            return {
+              ...t,
+              date: adj.businessDayDate,
+              nominalDay: day,
+              nominalDate: nominalIso,
+              updatedAt: nowIso,
+            };
+          }
+          return t;
+        })
+      );
+    } else {
+      const updated: AccountingTask = {
+        ...task,
+        date: newDate,
+        nominalDay: day,
+        nominalDate: newDate,
+        updatedAt: nowIso,
+      };
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+    }
+  };
+
+  // Toggle complete / in_progress
+  const handleToggleTaskComplete = (task: AccountingTask) => {
+    const nowIso = new Date().toISOString();
+    if (task.clients.length === 0) {
+      const updated: AccountingTask = {
+        ...task,
+        isCompleted: !task.isCompleted,
+        updatedAt: nowIso,
+      };
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+    } else {
+      const allDone = task.clients.every((c) => c.status === 'done');
+      const newStatus: ClientTaskStatus = allDone ? 'in_progress' : 'done';
+      const updated: AccountingTask = {
+        ...task,
+        clients: task.clients.map((c) => ({ ...c, status: newStatus })),
+        updatedAt: nowIso,
+      };
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+    }
+  };
+
+  // Delete task or recurrence series
+  const handleDeleteTask = (taskId: string, deleteSeries?: boolean) => {
+    const taskToDelete = tasks.find((t) => t.id === taskId);
+    if (!taskToDelete) return;
+
+    const seriesId = taskToDelete.recurrenceSeriesId;
+    const isRecurring = Boolean(seriesId) || (taskToDelete.recurrence && taskToDelete.recurrence !== 'none');
+
+    if (isRecurring && deleteSeries) {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Eliminar Obrigação / Tarefa Recorrente',
+        message: `Tem a certeza que deseja eliminar a obrigação "${taskToDelete.title}"? Será removida de todos os meses do calendário.`,
+        isDestructive: true,
+        onConfirm: () => {
+          setTasks((prev) =>
+            prev.filter((t) => {
+              if (seriesId && t.recurrenceSeriesId === seriesId) return false;
+              if (
+                t.title.trim().toLowerCase() === taskToDelete.title.trim().toLowerCase() &&
+                t.recurrence === taskToDelete.recurrence
+              ) {
+                return false;
+              }
+              return t.id !== taskId;
+            })
+          );
+          if (detailTaskId === taskId) {
+            setDetailTaskId(null);
+          }
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+    } else {
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Eliminar Tarefa',
+        message: `Tem a certeza que deseja eliminar a tarefa "${taskToDelete.title}" de ${formatDatePT(taskToDelete.date)}?`,
+        isDestructive: true,
+        onConfirm: () => {
+          setTasks((prev) => prev.filter((t) => t.id !== taskId));
+          if (detailTaskId === taskId) {
+            setDetailTaskId(null);
+          }
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+    }
+  };
+
+  // Restore/Populate Official Portuguese Accounting Fiscal Calendar
+  const handleRestoreFiscalCalendar = () => {
+    const fiscalTasks = generateFiscalTasksForMonth(currentYear, currentMonth);
+    setTasks((prev) => {
+      const existingKeys = new Set(prev.map((t) => `${t.title.toLowerCase().trim()}_${t.date}`));
+      const merged = [...prev];
+      for (const ft of fiscalTasks) {
+        const key = `${ft.title.toLowerCase().trim()}_${ft.date}`;
+        if (!existingKeys.has(key)) {
+          merged.push(ft);
+        }
+      }
+      const { tasks: synced } = syncRecurringTasks(merged, currentYear, currentMonth);
+      return synced;
+    });
+  };
+
+  // Add a single obligation from Fiscal Calendar modal
+  const handleAddSingleFiscalTask = (def: FiscalObligationDefinition) => {
+    const monthStr = String(currentMonth + 1).padStart(2, '0');
+    const monthName = PT_MONTHS[currentMonth];
+    const maxDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const safeNominalDay = Math.min(def.nominalDay, maxDays);
+    const nominalDate = `${currentYear}-${monthStr}-${String(safeNominalDay).padStart(2, '0')}`;
+    const adjustment = adjustToNextBusinessDay(nominalDate);
+    const effectiveDate = adjustment.businessDayDate;
+    const nowIso = new Date().toISOString();
+
+    const newTask: AccountingTask = {
+      id: `${def.id}_${currentYear}_${monthStr}_${Date.now()}`,
+      title: def.title,
+      description: def.description,
+      date: effectiveDate,
+      generalNotes: `${def.notes}\n\nEntidade: ${def.legalEntity} · Categoria: ${def.category}`,
+      clients: [],
+      isCompleted: false,
+      recurrence: def.recurrence,
+      recurrenceSeriesId: def.seriesId,
+      nominalDay: def.nominalDay,
+      nominalDate: nominalDate,
+      periodLabel: `${monthName} de ${currentYear}`,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    setTasks((prev) => {
+      const list = [...prev, newTask];
+      const { tasks: synced } = syncRecurringTasks(list, currentYear, currentMonth);
+      return synced;
+    });
+  };
+
+  // Recurrence generator: creates next period occurrence
+  const handleGenerateNextPeriod = (task: AccountingTask) => {
+    if (!task.recurrence || task.recurrence === 'none') return;
+
+    const { nextDate, nextPeriodLabel, nominalDay: generatedNominalDay } = calculateNextOccurrence(
+      task.date,
+      task.recurrence,
+      task.recurrenceCustomDays,
+      task.nominalDay
+    );
+
+    // Check if task already exists for this title and next date
+    const alreadyExists = tasks.some(
+      (t) => t.title === task.title && t.date === nextDate
+    );
+
+    if (alreadyExists) {
+      alert(`Já existe uma tarefa "${task.title}" agendada para ${formatDatePT(nextDate)}.`);
+      return;
+    }
+
+    const newClients = task.clients.map((c) => ({
+      clientId: c.clientId,
+      clientName: c.clientName,
+      clientNif: c.clientNif,
+      status: 'in_progress' as const,
+      notes: '',
+    }));
+
+    const nowIso = new Date().toISOString();
+    const seriesId = task.recurrenceSeriesId || task.id;
+
+    const newOccurrence: AccountingTask = {
+      id: `task_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title: task.title,
+      description: task.description,
+      date: nextDate,
+      generalNotes: task.generalNotes,
+      clients: newClients,
+      isCompleted: false,
+      recurrence: task.recurrence,
+      recurrenceCustomDays: task.recurrenceCustomDays,
+      recurrenceSeriesId: seriesId,
+      nominalDay: generatedNominalDay,
+      nominalDate: task.nominalDay
+        ? `${nextDate.substring(0, 8)}${String(task.nominalDay).padStart(2, '0')}`
+        : undefined,
+      periodLabel: nextPeriodLabel,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    setTasks((prev) => {
+      const updated = prev.map((t) =>
+        t.id === task.id && !t.recurrenceSeriesId
+          ? { ...t, recurrenceSeriesId: seriesId }
+          : t
+      );
+      return [...updated, newOccurrence];
+    });
+
+    setDetailTaskId(newOccurrence.id);
+  };
+
+  // Client Management Handlers
+  const handleQuickCreateClient = async (name: string, nif?: string): Promise<Client | undefined> => {
+    const newClient: Client = {
+      id: `cli_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: name.trim(),
+      nif: nif?.trim() || undefined,
+      createdAt: new Date().toISOString(),
+    };
+    setClients((prev) => [...prev, newClient]);
+    return newClient;
+  };
+
+  const handleAddClient = (clientData: Omit<Client, 'id' | 'createdAt'>) => {
+    const newClient: Client = {
+      ...clientData,
+      id: `cli_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: new Date().toISOString(),
+    };
+    setClients((prev) => [...prev, newClient]);
+  };
+
+  const handleUpdateClient = (updatedClient: Client) => {
+    setClients((prev) => prev.map((c) => (c.id === updatedClient.id ? updatedClient : c)));
+    setTasks((prev) =>
+      prev.map((t) => ({
+        ...t,
+        clients: t.clients.map((tc) =>
+          tc.clientId === updatedClient.id
+            ? {
+                ...tc,
+                clientName: updatedClient.name,
+                clientNif: updatedClient.nif,
+              }
+            : tc
+        ),
+      }))
+    );
+  };
+
+  const handleToggleArchiveClient = (clientId: string) => {
+    setClients((prev) =>
+      prev.map((c) => (c.id === clientId ? { ...c, archived: !c.archived } : c))
+    );
+  };
+
+  const handleDeleteClient = (clientId: string) => {
+    const client = clients.find((c) => c.id === clientId);
+    const tasksCount = tasks.filter((t) => t.clients.some((c) => c.clientId === clientId)).length;
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Eliminar Cliente',
+      message:
+        tasksCount > 0
+          ? `O cliente "${client?.name}" está associado a ${tasksCount} tarefa(s). Tem a certeza que deseja eliminá-lo? Será também removido dessas tarefas.`
+          : `Tem a certeza que deseja eliminar o cliente "${client?.name}"?`,
+      isDestructive: true,
+      onConfirm: () => {
+        setClients((prev) => prev.filter((c) => c.id !== clientId));
+        setTasks((prev) =>
+          prev.map((t) => ({
+            ...t,
+            clients: t.clients.filter((c) => c.clientId !== clientId),
+          }))
+        );
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
+  // Backup & Restore Actions
+  const handleRestoreBackup = (backupData: AppBackupData) => {
+    setTasks(backupData.tasks);
+    setClients(backupData.clients);
+    setDetailTaskId(null);
+    setSelectedDate(null);
+  };
+
+  const handleClearAllData = () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Limpar Todos os Dados',
+      message:
+        'Tem a certeza que deseja apagar todas as tarefas e clientes e deixar a aplicação totalmente limpa? Esta ação não pode ser revertida.',
+      isDestructive: true,
+      onConfirm: () => {
+        setClients([]);
+        setTasks([]);
+        setDetailTaskId(null);
+        setSelectedDate(null);
+        setIsBackupModalOpen(false);
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+      {/* Top Navbar */}
+      <Navbar
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        tasksCount={tasks.length}
+        onOpenNewTask={() => handleOpenNewTask()}
+        onOpenClients={() => setIsClientManagerOpen(true)}
+        onOpenBackup={() => setIsBackupModalOpen(true)}
+        onOpenFiscalCalendar={() => setIsFiscalCalendarOpen(true)}
+        saveStatus={saveStatus}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode((d) => !d)}
+      />
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Navigation Tabs Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-xs">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('calendar')}
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'calendar'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <CalendarIcon className="w-4 h-4" />
+              <span>Calendário Mensal</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('all_tasks')}
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'all_tasks'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <ListTodo className="w-4 h-4" />
+              <span>Todas as Tarefas</span>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsFiscalCalendarOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Calendário Fiscal</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleOpenNewTask()}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nova Tarefa</span>
+            </button>
+          </div>
+        </div>
+
+        {/* TAB 1: Calendário Mensal */}
+        {activeTab === 'calendar' && (
+          <div className="space-y-6">
+            <section aria-label="Calendário Mensal">
+              <CalendarMonth
+                currentYear={currentYear}
+                currentMonth={currentMonth}
+                selectedDate={selectedDate}
+                tasks={tasks}
+                onSelectDate={setSelectedDate}
+                onPrevMonth={handlePrevMonth}
+                onNextMonth={handleNextMonth}
+                onCurrentMonth={handleCurrentMonth}
+              />
+            </section>
+
+            <section aria-label="Lista de Tarefas do Mês">
+              <TaskList
+                tasks={tasks}
+                currentYear={currentYear}
+                currentMonth={currentMonth}
+                selectedDate={selectedDate}
+                onClearDateFilter={() => setSelectedDate(null)}
+                onSelectTask={(task) => setDetailTaskId(task.id)}
+                onOpenNewTask={handleOpenNewTask}
+              />
+            </section>
+          </div>
+        )}
+
+        {/* TAB 2: Aba para ver as tarefas que tenho criadas */}
+        {activeTab === 'all_tasks' && (
+          <section aria-label="Aba de Todas as Tarefas Criadas">
+            <AllTasksView
+              tasks={tasks}
+              allClients={clients}
+              onSelectTask={(task) => setDetailTaskId(task.id)}
+              onOpenNewTask={handleOpenNewTask}
+              onOpenEditTask={handleOpenEditTask}
+              onDeleteTask={handleDeleteTask}
+              onToggleTaskComplete={handleToggleTaskComplete}
+              onQuickChangeDate={handleQuickChangeDate}
+              onRestoreFiscalCalendar={handleRestoreFiscalCalendar}
+            />
+          </section>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="mt-auto py-6 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 transition-colors">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p>
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              ContabTarefas
+            </span>{' '}
+            — Gestão diária de tarefas e calendário fiscal para contabilistas e gabinetes.
+          </p>
+          <p className="text-[11px] text-slate-400">
+            Armazenamento 100% no navegador · Sem custos de servidor · Compatível com GitHub Pages
+          </p>
+        </div>
+      </footer>
+
+      {/* MODALS */}
+
+      {/* 1. Modal do Calendário Fiscal (AT & Segurança Social) */}
+      <FiscalCalendarModal
+        isOpen={isFiscalCalendarOpen}
+        onClose={() => setIsFiscalCalendarOpen(false)}
+        currentTasks={tasks}
+        onLoadAllFiscalTasks={handleRestoreFiscalCalendar}
+        onAddSingleFiscalTask={handleAddSingleFiscalTask}
+      />
+
+      {/* 2. Painel de Detalhes da Tarefa */}
+      {activeDetailTask && (
+        <TaskDetailModal
+          task={activeDetailTask}
+          allClients={clients}
+          isOpen={Boolean(activeDetailTask)}
+          onClose={() => setDetailTaskId(null)}
+          onUpdateTask={handleUpdateTask}
+          onDeleteTask={handleDeleteTask}
+          onEditTask={(t) => {
+            setDetailTaskId(null);
+            handleOpenEditTask(t);
+          }}
+          onGenerateNextPeriod={handleGenerateNextPeriod}
+        />
+      )}
+
+      {/* 3. Modal de Criação / Edição de Tarefas */}
+      <TaskFormModal
+        isOpen={isTaskFormOpen}
+        onClose={() => {
+          setIsTaskFormOpen(false);
+          setEditingTask(null);
+        }}
+        onSave={handleSaveTask}
+        initialTask={editingTask}
+        presetDate={presetTaskDate}
+        allClients={clients}
+        onQuickCreateClient={handleQuickCreateClient}
+      />
+
+      {/* 4. Gestão de Empresas e Clientes */}
+      <ClientManagerModal
+        isOpen={isClientManagerOpen}
+        onClose={() => setIsClientManagerOpen(false)}
+        clients={clients}
+        tasks={tasks}
+        onAddClient={handleAddClient}
+        onUpdateClient={handleUpdateClient}
+        onDeleteClient={handleDeleteClient}
+        onToggleArchiveClient={handleToggleArchiveClient}
+      />
+
+      {/* 5. Cópias de Segurança & Reposição */}
+      <BackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        tasks={tasks}
+        clients={clients}
+        onRestoreBackup={handleRestoreBackup}
+        onClearAllData={handleClearAllData}
+      />
+
+      {/* 6. Caixa de Diálogo de Confirmação */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        isDestructive={confirmDialog.isDestructive}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
+      />
+    </div>
+  );
+}

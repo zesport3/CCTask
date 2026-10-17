@@ -1,0 +1,6 @@
+{
+  "name": "ContabTarefas - Gestão de Gabinete",
+  "description": "Aplicação simples, rápida e prática para gerir tarefas fiscais, prazos e clientes de um gabinete de contabilidade.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
