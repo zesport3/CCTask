@@ -208,52 +208,9 @@ export const AllTasksView: React.FC<AllTasksViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Banner / Hero Summary (Clean presentation without counter numbers) */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 sm:p-6 shadow-xs transition-colors">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-                <CalendarDays className="w-5 h-5" />
-              </span>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-                  Todas as Tarefas Criadas
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                  Lista consolidada das tarefas e obrigações fiscais. Cada tarefa ou obrigação repetível é apresentada apenas uma vez com a respetiva periodicidade.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={onRestoreFiscalCalendar}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
-              title="Carregar ou restaurar as obrigações do Calendário Fiscal (SAF-T, DMR, TSU, IVA, etc.)"
-            >
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span>Calendário Fiscal AT</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onOpenNewTask()}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-xs transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Nova Tarefa</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 shadow-xs transition-colors space-y-4">
+    <div className="space-y-4">
+      {/* Sleek Search & Filter Bar */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 sm:p-4 shadow-xs transition-colors">
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
           {/* Search Box */}
           <div className="relative flex-1">
@@ -262,7 +219,7 @@ export const AllTasksView: React.FC<AllTasksViewProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar por obrigação, periodicidade, notas, cliente..."
+              placeholder="Pesquisar tarefas, obrigações ou clientes..."
               className="w-full pl-9 pr-14 py-2 text-xs sm:text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             />
             {searchTerm && (
@@ -276,62 +233,38 @@ export const AllTasksView: React.FC<AllTasksViewProps> = ({
             )}
           </div>
 
-          {/* Sort Toggle */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Simple Status Filter and Add Button */}
+          <div className="flex items-center gap-2 shrink-0 justify-between sm:justify-start">
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+              {[
+                { id: 'all', label: 'Todas' },
+                { id: 'in_progress', label: 'Em Curso' },
+                { id: 'completed', label: 'Concluídas' },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => setStatusFilter(pill.id as any)}
+                  className={`px-2.5 py-1 text-xs rounded-md transition-colors cursor-pointer ${
+                    statusFilter === pill.id
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 font-semibold shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {pill.label}
+                </button>
+              ))}
+            </div>
+
             <button
               type="button"
-              onClick={() => setSortBy((prev) => (prev === 'date' ? 'title' : 'date'))}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              onClick={() => onOpenNewTask()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer"
             >
-              <ArrowUpDown className="w-3.5 h-3.5" />
-              <span>{sortBy === 'date' ? 'Ordenar por Data' : 'Ordenar por Nome (A-Z)'}</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nova Tarefa</span>
             </button>
           </div>
-        </div>
-
-        {/* Filter Pills (No numbers!) */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <span className="text-xs text-slate-400 font-medium mr-1">Estado:</span>
-          {[
-            { id: 'all', label: 'Todas' },
-            { id: 'in_progress', label: 'Em Curso' },
-            { id: 'completed', label: 'Concluídas' },
-          ].map((pill) => (
-            <button
-              key={pill.id}
-              type="button"
-              onClick={() => setStatusFilter(pill.id as any)}
-              className={`px-3 py-1 text-xs rounded-md transition-colors cursor-pointer ${
-                statusFilter === pill.id
-                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {pill.label}
-            </button>
-          ))}
-
-          <span className="text-xs text-slate-400 font-medium ml-3 mr-1">Periodicidade:</span>
-          {[
-            { id: 'all', label: 'Todas' },
-            { id: 'monthly', label: 'Mensais' },
-            { id: 'quarterly', label: 'Trimestrais' },
-            { id: 'yearly', label: 'Anuais' },
-            { id: 'none', label: 'Pontuais' },
-          ].map((pill) => (
-            <button
-              key={pill.id}
-              type="button"
-              onClick={() => setRecurrenceFilter(pill.id as any)}
-              className={`px-3 py-1 text-xs rounded-md transition-colors cursor-pointer ${
-                recurrenceFilter === pill.id
-                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {pill.label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -530,15 +463,30 @@ const UniqueTaskRowCard: React.FC<UniqueTaskRowCardProps> = ({
               </div>
             )}
 
-            {/* Clients note if applicable */}
-            {item.clients.length > 0 && (
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-                <Building2 className="w-3.5 h-3.5 text-blue-500" />
-                <span>
-                  {item.clients.length} {item.clients.length === 1 ? 'empresa associada' : 'empresas associadas'}:{' '}
-                  {item.clients.slice(0, 3).map((c) => c.clientName).join(', ')}
-                  {item.clients.length > 3 ? ` e mais ${item.clients.length - 3}` : ''}
+            {/* Associated Clients */}
+            {item.clients.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1 mr-1">
+                  <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Clientes:</span>
                 </span>
+                {item.clients.map((c) => (
+                  <span
+                    key={c.clientId}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                      c.status === 'done'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                        : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    {c.status === 'done' ? '✓ ' : '○ '}
+                    {c.clientName}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-400 italic pt-1 block">
+                Sem clientes associados
               </span>
             )}
           </div>

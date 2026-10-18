@@ -803,61 +803,10 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Navigation Tabs Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-xs">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('calendar')}
-              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
-                activeTab === 'calendar'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              <CalendarIcon className="w-4 h-4" />
-              <span>Calendário Mensal</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('all_tasks')}
-              className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer ${
-                activeTab === 'all_tasks'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              <ListTodo className="w-4 h-4" />
-              <span>Todas as Tarefas</span>
-            </button>
-          </div>
-
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setIsFiscalCalendarOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Calendário Fiscal</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleOpenNewTask()}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Nova Tarefa</span>
-            </button>
-          </div>
-        </div>
-
-        {/* TAB 1: Calendário Mensal */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+        {/* TAB 1: Calendário Mensal e Tarefas com Clientes */}
         {activeTab === 'calendar' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-5">
             <section aria-label="Calendário Mensal">
               <CalendarMonth
                 currentYear={currentYear}
@@ -871,7 +820,7 @@ export default function App() {
               />
             </section>
 
-            <section aria-label="Lista de Tarefas do Mês">
+            <section aria-label="Lista de Tarefas do Mês e Clientes Associados">
               <TaskList
                 tasks={tasks}
                 currentYear={currentYear}
@@ -880,6 +829,8 @@ export default function App() {
                 onClearDateFilter={() => setSelectedDate(null)}
                 onSelectTask={(task) => setDetailTaskId(task.id)}
                 onOpenNewTask={handleOpenNewTask}
+                onUpdateTask={handleUpdateTask}
+                onToggleTaskComplete={handleToggleTaskComplete}
               />
             </section>
           </div>
@@ -903,19 +854,9 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="mt-auto py-6 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 transition-colors">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>
-            <span className="font-semibold text-slate-700 dark:text-slate-300">
-              ContabTarefas
-            </span>{' '}
-            — Gestão diária de tarefas e calendário fiscal para contabilistas e gabinetes.
-          </p>
-          <p className="text-[11px] text-slate-400">
-            Armazenamento 100% no navegador · Sem custos de servidor · Compatível com GitHub Pages
-          </p>
-        </div>
+      {/* Clean Subtle Footer */}
+      <footer className="py-4 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
+        ContabTarefas · Calendário e Tarefas do Gabinete
       </footer>
 
       {/* MODALS */}
