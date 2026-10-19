@@ -189,7 +189,6 @@ export function getPortugueseHoliday(date: Date): { isHoliday: boolean; name?: s
   if (m === 6 && d === 10) return { isHoliday: true, name: 'Dia de Portugal (10 de Junho)' };
   if (m === 8 && d === 15) return { isHoliday: true, name: 'Assunção de Nossa Senhora' };
   if (m === 10 && d === 5) return { isHoliday: true, name: 'Implantação da República (5 de Outubro)' };
-  if (m === 10 && d === 20) return { isHoliday: true, name: 'Feriado Municipal Covilhã' };
   if (m === 11 && d === 1) return { isHoliday: true, name: 'Dia de Todos os Santos' };
   if (m === 12 && d === 1) return { isHoliday: true, name: 'Restauração da Independência' };
   if (m === 12 && d === 8) return { isHoliday: true, name: 'Imaculada Conceição' };

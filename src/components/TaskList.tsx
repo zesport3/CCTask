@@ -11,7 +11,12 @@ import {
   Building2,
 } from 'lucide-react';
 import { AccountingTask, ClientTaskStatus } from '../types/accounting';
-import { formatDatePT, formatMonthYearPT, getTodayDateString } from '../utils/dateUtils';
+import {
+  formatDatePT,
+  formatMonthYearPT,
+  getTodayDateString,
+  getPortugueseHoliday,
+} from '../utils/dateUtils';
 import { calculateTaskProgress } from '../utils/storage';
 
 interface TaskListProps {
@@ -50,9 +55,18 @@ export const TaskList: React.FC<TaskListProps> = ({
       list = list.filter((t) => t.date.startsWith(monthPrefix));
     }
 
-    // Sort by date ascending (closest date first)
+  // Sort by date ascending (closest date first)
     return [...list].sort((a, b) => a.date.localeCompare(b.date));
   }, [tasks, selectedDate, currentYear, currentMonth]);
+
+  // Check if selectedDate is a holiday
+  const selectedHoliday = React.useMemo(() => {
+    if (!selectedDate || !selectedDate.includes('-')) return null;
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const holiday = getPortugueseHoliday(dateObj);
+    return holiday.isHoliday ? holiday.name : null;
+  }, [selectedDate]);
 
   const handleToggleClient = (task: AccountingTask, clientId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -74,10 +88,10 @@ export const TaskList: React.FC<TaskListProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs p-4 sm:p-5 transition-colors">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs p-3.5 sm:p-5 transition-colors">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3.5 sm:mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center gap-2 flex-wrap">
           <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
             {selectedDate ? (
               <span>Tarefas de {formatDatePT(selectedDate)}</span>
@@ -92,7 +106,7 @@ export const TaskList: React.FC<TaskListProps> = ({
             <button
               type="button"
               onClick={onClearDateFilter}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline cursor-pointer ml-2"
+              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer ml-1"
             >
               Ver todo o mês
             </button>
@@ -102,12 +116,34 @@ export const TaskList: React.FC<TaskListProps> = ({
         <button
           type="button"
           onClick={() => onOpenNewTask(selectedDate || undefined)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-xs transition-colors cursor-pointer min-h-[36px]"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Nova Tarefa</span>
         </button>
       </div>
+
+      {/* Holiday Alert for selected date: When user clicks on a day, show the holiday name */}
+      {selectedHoliday && (
+        <div className="mb-3.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex items-center justify-between gap-3 text-rose-800 dark:text-rose-200 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-base shrink-0">
+              🎉
+            </span>
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
+                Feriado Nacional ({formatDatePT(selectedDate!)})
+              </div>
+              <div className="text-sm font-bold text-rose-900 dark:text-rose-100 truncate">
+                {selectedHoliday}
+              </div>
+            </div>
+          </div>
+          <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 px-2 py-0.5 bg-rose-100/80 dark:bg-rose-900/50 rounded-md shrink-0">
+            Feriado
+          </span>
+        </div>
+      )}
 
       {/* Task List Content */}
       {filteredTasks.length === 0 ? (
@@ -116,7 +152,9 @@ export const TaskList: React.FC<TaskListProps> = ({
             <CalendarIcon className="w-5 h-5" />
           </div>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-3">
-            {selectedDate
+            {selectedHoliday
+              ? `Este dia é feriado (${selectedHoliday}). Não existem tarefas agendadas para ${formatDatePT(selectedDate!)}.`
+              : selectedDate
               ? `Não existem tarefas agendadas para ${formatDatePT(selectedDate)}.`
               : `Não existem tarefas registadas para ${formatMonthYearPT(currentYear, currentMonth)}.`}
           </p>
@@ -213,7 +251,7 @@ export const TaskList: React.FC<TaskListProps> = ({
                         </span>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         {task.clients.map((c) => {
                           const isDone = c.status === 'done';
                           return (
@@ -221,10 +259,10 @@ export const TaskList: React.FC<TaskListProps> = ({
                               key={c.clientId}
                               type="button"
                               onClick={(e) => handleToggleClient(task, c.clientId, e)}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all border cursor-pointer ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border cursor-pointer min-h-[34px] select-none active:scale-95 ${
                                 isDone
-                                  ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60'
-                                  : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                  ? 'bg-emerald-50 dark:bg-emerald-950/70 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60'
+                                  : 'bg-slate-50 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
                               }`}
                               title={
                                 isDone
@@ -235,7 +273,7 @@ export const TaskList: React.FC<TaskListProps> = ({
                               {isDone ? (
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                               ) : (
-                                <span className="w-2.5 h-2.5 rounded-full border border-slate-400 dark:border-slate-500 shrink-0" />
+                                <span className="w-3 h-3 rounded-full border-2 border-slate-400 dark:border-slate-500 shrink-0" />
                               )}
                               <span>{c.clientName}</span>
                               {c.clientNif && (

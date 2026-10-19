@@ -788,11 +788,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
-      {/* Top Navbar */}
+      {/* Top Navbar & Mobile Bottom Bar */}
       <Navbar
         activeTab={activeTab}
         onChangeTab={setActiveTab}
         tasksCount={tasks.length}
+        clientsCount={clients.length}
         onOpenNewTask={() => handleOpenNewTask()}
         onOpenClients={() => setIsClientManagerOpen(true)}
         onOpenBackup={() => setIsBackupModalOpen(true)}
@@ -802,11 +803,11 @@ export default function App() {
         onToggleDarkMode={() => setIsDarkMode((d) => !d)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+      {/* Main Content Area - padded at bottom on mobile for bottom navigation bar */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-6 pb-24 sm:pb-8 space-y-3.5 sm:space-y-6">
         {/* TAB 1: Calendário Mensal e Tarefas com Clientes */}
         {activeTab === 'calendar' && (
-          <div className="space-y-4 sm:space-y-5">
+          <div className="space-y-3.5 sm:space-y-5">
             <section aria-label="Calendário Mensal">
               <CalendarMonth
                 currentYear={currentYear}
@@ -855,7 +856,7 @@ export default function App() {
       </main>
 
       {/* Clean Subtle Footer */}
-      <footer className="py-4 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
+      <footer className="hidden sm:block py-4 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
         ContabTarefas · Calendário e Tarefas do Gabinete
       </footer>
 
