@@ -169,7 +169,10 @@ export function getClientAssignedTaskKeys(
 
 /**
  * Applies a client's selected task obligations to all months across the system.
- * If a selected obligation does not exist yet in tasks, it instantiates it for all months of the current year.
+ * Rules:
+ * 1. For a new company / client, tasks are never created or assigned backwards before its creation date (client.createdAt).
+ * 2. If a selected obligation does not exist yet in tasks, it instantiates occurrences from creation date onwards for the year.
+ * 3. When an obligation is unselected, past tasks (before today) retain their historical client record, while future tasks have the client removed.
  */
 export function applyClientObligationsToTasks(
   allTasks: AccountingTask[],
@@ -180,6 +183,10 @@ export function applyClientObligationsToTasks(
 ): AccountingTask[] {
   let updatedTasks = [...allTasks];
   const nowIso = new Date().toISOString();
+  const todayStr = nowIso.substring(0, 10);
+  const clientCreationDateStr = client.createdAt
+    ? client.createdAt.substring(0, 10)
+    : todayStr;
   const fiscalDefs = getFiscalObligations();
 
   // Helper to test if a task matches a series ID
@@ -215,6 +222,11 @@ export function applyClientObligationsToTasks(
           const safeNominalDay = Math.min(fiscalDef.nominalDay, maxDays);
           const nominalDate = `${currentYear}-${monthStr}-${String(safeNominalDay).padStart(2, '0')}`;
           const adj = adjustToNextBusinessDay(nominalDate);
+
+          // DO NOT create tasks before client creation date
+          if (adj.businessDayDate < clientCreationDateStr) {
+            continue;
+          }
 
           const newTask: AccountingTask = {
             id: `${fiscalDef.id}_${currentYear}_${monthStr}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
@@ -271,6 +283,11 @@ export function applyClientObligationsToTasks(
         }
         return t;
       } else {
+        // Rule: DO NOT add tasks backwards before client creation date
+        if (t.date < clientCreationDateStr) {
+          return t;
+        }
+
         // Add client to this task occurrence
         return {
           ...t,
@@ -289,9 +306,10 @@ export function applyClientObligationsToTasks(
         };
       }
     } else {
-      // If this task was part of a series that is NOT selected, remove the client if present
-      // Only remove if this task corresponds to a known series in our list of obligations
-      if (existingClientIndex >= 0) {
+      // If this task was part of a series that is NOT selected:
+      // Preserve past task history (do not remove from past tasks t.date < todayStr).
+      // Only remove client from future tasks.
+      if (existingClientIndex >= 0 && t.date >= todayStr) {
         return {
           ...t,
           clients: t.clients.filter((c) => c.clientId !== client.id),
@@ -300,6 +318,12 @@ export function applyClientObligationsToTasks(
       }
       return t;
     }
+  });
+
+  // Filter out any future tasks that were left with 0 clients due to deselection
+  updatedTasks = updatedTasks.filter((t) => {
+    if (t.date < todayStr) return true;
+    return t.clients.length > 0;
   });
 
   // 3. Automatically run syncRecurringTasks so upcoming months stay synchronized with the updated client list

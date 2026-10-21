@@ -700,42 +700,66 @@ export default function App() {
     setDetailTaskId(newOccurrence.id);
   };
 
+  // Default preset: Regime Trimestral sem Salários
+  const DEFAULT_QUARTERLY_NO_SALARY_TASKS = [
+    'series_fiscal_saft',
+    'series_fiscal_iva_trimestral_declaracao',
+    'series_fiscal_iva_trimestral_pagamento',
+    'series_fiscal_modelo22',
+    'series_fiscal_ies',
+  ];
+
   // Client Management Handlers
   const handleQuickCreateClient = async (name: string, nif?: string): Promise<Client | undefined> => {
     const newClient: Client = {
       id: `cli_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name: name.trim(),
       nif: nif?.trim() || undefined,
+      assignedTasks: DEFAULT_QUARTERLY_NO_SALARY_TASKS,
       createdAt: new Date().toISOString(),
     };
     setClients((prev) => [...prev, newClient]);
+    setTasks((prevTasks) => {
+      return applyClientObligationsToTasks(
+        prevTasks,
+        newClient,
+        DEFAULT_QUARTERLY_NO_SALARY_TASKS,
+        currentYear,
+        currentMonth
+      );
+    });
     return newClient;
   };
 
   const handleAddClient = (
     clientData: Omit<Client, 'id' | 'createdAt'>,
-    selectedTaskKeys: string[] = []
+    selectedTaskKeys: string[] = DEFAULT_QUARTERLY_NO_SALARY_TASKS
   ) => {
+    const keysToUse =
+      selectedTaskKeys && selectedTaskKeys.length > 0
+        ? selectedTaskKeys
+        : (clientData.assignedTasks && clientData.assignedTasks.length > 0)
+        ? clientData.assignedTasks
+        : DEFAULT_QUARTERLY_NO_SALARY_TASKS;
+
     const newClient: Client = {
       ...clientData,
       id: `cli_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      assignedTasks: selectedTaskKeys,
+      assignedTasks: keysToUse,
       createdAt: new Date().toISOString(),
     };
 
     setClients((prev) => [...prev, newClient]);
 
-    if (selectedTaskKeys && selectedTaskKeys.length > 0) {
-      setTasks((prevTasks) => {
-        return applyClientObligationsToTasks(
-          prevTasks,
-          newClient,
-          selectedTaskKeys,
-          currentYear,
-          currentMonth
-        );
-      });
-    }
+    setTasks((prevTasks) => {
+      return applyClientObligationsToTasks(
+        prevTasks,
+        newClient,
+        keysToUse,
+        currentYear,
+        currentMonth
+      );
+    });
   };
 
   const handleUpdateClient = (
@@ -771,23 +795,53 @@ export default function App() {
 
   const handleDeleteClient = (clientId: string) => {
     const client = clients.find((c) => c.id === clientId);
-    const tasksCount = tasks.filter((t) => t.clients.some((c) => c.clientId === clientId)).length;
+    const todayStr = getTodayDateString();
+
+    const pastCount = tasks.filter(
+      (t) => t.date < todayStr && t.clients.some((c) => c.clientId === clientId)
+    ).length;
+    const futureCount = tasks.filter(
+      (t) => t.date >= todayStr && t.clients.some((c) => c.clientId === clientId)
+    ).length;
 
     setConfirmDialog({
       isOpen: true,
-      title: 'Eliminar Cliente',
+      title: 'Eliminar Empresa',
       message:
-        tasksCount > 0
-          ? `O cliente "${client?.name}" está associado a ${tasksCount} tarefa(s). Tem a certeza que deseja eliminá-lo? Será também removido dessas tarefas.`
-          : `Tem a certeza que deseja eliminar o cliente "${client?.name}"?`,
+        `Tem a certeza que deseja eliminar "${client?.name || 'esta empresa'}"? ` +
+        (futureCount > 0
+          ? `As suas tarefas futuras (${futureCount}) serão eliminadas. `
+          : '') +
+        (pastCount > 0
+          ? `O histórico de tarefas passadas (${pastCount}) ficará mantido para registo.`
+          : 'Esta ação não pode ser desfeita.'),
       isDestructive: true,
       onConfirm: () => {
+        // 1. Remove company from clients list
         setClients((prev) => prev.filter((c) => c.id !== clientId));
+
+        // 2. Update tasks:
+        // - Past tasks (t.date < todayStr): retain client in t.clients as historical record
+        // - Future tasks (t.date >= todayStr): remove client; if 0 clients left, eliminate the task
         setTasks((prev) =>
-          prev.map((t) => ({
-            ...t,
-            clients: t.clients.filter((c) => c.clientId !== clientId),
-          }))
+          prev
+            .map((t) => {
+              if (t.date < todayStr) {
+                // Keep historical records intact
+                return t;
+              }
+              // Future tasks: remove client
+              return {
+                ...t,
+                clients: t.clients.filter((c) => c.clientId !== clientId),
+              };
+            })
+            .filter((t) => {
+              // Always keep past tasks
+              if (t.date < todayStr) return true;
+              // For future tasks, if no clients left, eliminate the task
+              return t.clients.length > 0;
+            })
         );
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
       },

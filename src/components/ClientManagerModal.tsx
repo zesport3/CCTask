@@ -81,16 +81,13 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
     setName('');
     setNif('');
     setNotes('');
-    // By default for a new client in an accounting firm, we can pre-select the standard monthly obligations
-    // or let them choose presets
+    // By default for a new client: Regime Trimestral sem Salários
     setSelectedTaskKeys([
       'series_fiscal_saft',
-      'series_fiscal_dmr',
-      'series_fiscal_dri',
-      'series_fiscal_tsu',
-      'series_fiscal_retencoes',
-      'series_fiscal_iva_mensal_declaracao',
-      'series_fiscal_iva_mensal_pagamento',
+      'series_fiscal_iva_trimestral_declaracao',
+      'series_fiscal_iva_trimestral_pagamento',
+      'series_fiscal_modelo22',
+      'series_fiscal_ies',
     ]);
     setTaskSearch('');
     setFormError('');
@@ -118,9 +115,28 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
   };
 
   // Preset Selection Handlers
-  const applyPreset = (presetType: 'geral_salarios' | 'trimestral_salarios' | 'apenas_saft' | 'todas_mensais' | 'limpar') => {
+  const applyPreset = (
+    presetType:
+      | 'trimestral_sem_salarios'
+      | 'trimestral_salarios'
+      | 'geral_salarios'
+      | 'apenas_saft'
+      | 'todas_mensais'
+      | 'limpar'
+  ) => {
     if (presetType === 'limpar') {
       setSelectedTaskKeys([]);
+      return;
+    }
+
+    if (presetType === 'trimestral_sem_salarios') {
+      setSelectedTaskKeys([
+        'series_fiscal_saft',
+        'series_fiscal_iva_trimestral_declaracao',
+        'series_fiscal_iva_trimestral_pagamento',
+        'series_fiscal_modelo22',
+        'series_fiscal_ies',
+      ]);
       return;
     }
 
@@ -141,6 +157,8 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
         'series_fiscal_retencoes',
         'series_fiscal_iva_mensal_declaracao',
         'series_fiscal_iva_mensal_pagamento',
+        'series_fiscal_modelo22',
+        'series_fiscal_ies',
       ]);
       return;
     }
@@ -154,6 +172,8 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
         'series_fiscal_retencoes',
         'series_fiscal_iva_trimestral_declaracao',
         'series_fiscal_iva_trimestral_pagamento',
+        'series_fiscal_modelo22',
+        'series_fiscal_ies',
       ]);
       return;
     }
@@ -420,7 +440,7 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                 <div className="flex items-start gap-2 p-2.5 bg-blue-100/60 dark:bg-blue-900/30 rounded-lg text-xs text-blue-900 dark:text-blue-200 mb-3">
                   <Info className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 mt-0.5" />
                   <p>
-                    As tarefas selecionadas ficarão <strong>automaticamente associadas a este cliente em todos os meses</strong> (Janeiro a Dezembro e meses futuros). No calendário e na lista de tarefas, este cliente aparecerá incluído em cada uma dessas obrigações.
+                    As tarefas selecionadas ficam <strong>associadas a partir da data de criação da empresa e para meses futuros</strong>. Tarefas passadas mantêm o registo histórico.
                   </p>
                 </div>
 
@@ -435,24 +455,25 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                         </span>
                         <button
                           type="button"
-                          onClick={() => applyPreset('geral_salarios')}
-                          className="px-2.5 py-1 text-[11px] font-medium bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-md shadow-2xs"
+                          onClick={() => applyPreset('trimestral_sem_salarios')}
+                          className="px-2.5 py-1 text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/70 hover:bg-blue-100 dark:hover:bg-blue-900/80 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded-md shadow-2xs flex items-center gap-1"
                         >
-                          Regime Geral + Salários
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+                          Trimestral s/ Salários (Predefinido)
                         </button>
                         <button
                           type="button"
                           onClick={() => applyPreset('trimestral_salarios')}
                           className="px-2.5 py-1 text-[11px] font-medium bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-md shadow-2xs"
                         >
-                          Regime Trimestral + Salários
+                          Trimestral c/ Salários
                         </button>
                         <button
                           type="button"
-                          onClick={() => applyPreset('todas_mensais')}
+                          onClick={() => applyPreset('geral_salarios')}
                           className="px-2.5 py-1 text-[11px] font-medium bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-md shadow-2xs"
                         >
-                          Todas as Mensais
+                          Regime Geral + Salários
                         </button>
                         <button
                           type="button"
