@@ -27,12 +27,21 @@ import {
   syncRecurringTasks,
   adjustToNextBusinessDay,
   PT_MONTHS,
+  getTodayDateString,
 } from './utils/dateUtils';
 import {
   generateFiscalTasksForMonth,
   FiscalObligationDefinition,
 } from './utils/fiscalCalendar';
 import { applyClientObligationsToTasks } from './utils/clientTaskUtils';
+import {
+  isNotificationSupported,
+  getNotificationPermission,
+  requestNotificationPermission,
+  checkAndSendDueDateNotifications,
+  NotificationPermissionState,
+} from './utils/notificationService';
+import { BellRing, X } from 'lucide-react';
 
 export default function App() {
   // Application Data State
@@ -144,6 +153,31 @@ export default function App() {
       setTasks(synced);
     }
   }, [currentYear, currentMonth, isLoaded, tasks]);
+
+  // Due date notification state
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(() =>
+    getNotificationPermission()
+  );
+  const [dismissedNotificationToday, setDismissedNotificationToday] = useState(false);
+
+  // Send notification on the final day of tasks (prazos limite hoje)
+  useEffect(() => {
+    if (!isLoaded || tasks.length === 0) return;
+    checkAndSendDueDateNotifications(tasks);
+
+    // Periodically check every 15 minutes if app stays open
+    const interval = setInterval(() => {
+      checkAndSendDueDateNotifications(tasks);
+    }, 15 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [tasks, isLoaded]);
+
+  const todayDateStr = getTodayDateString();
+  const tasksDueToday = React.useMemo(() => {
+    if (!isLoaded) return [];
+    return tasks.filter((t) => t.date === todayDateStr);
+  }, [tasks, isLoaded, todayDateStr]);
 
   // Current task selected for details (reactive to tasks changes)
   const activeDetailTask = tasks.find((t) => t.id === detailTaskId) || null;
@@ -805,6 +839,65 @@ export default function App() {
 
       {/* Main Content Area - padded at bottom on mobile for bottom navigation bar */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-6 pb-24 sm:pb-8 space-y-3.5 sm:space-y-6">
+        {/* Banner de Notificação: Dia Final da Tarefa */}
+        {tasksDueToday.length > 0 && !dismissedNotificationToday && (
+          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl p-3 sm:p-4 text-amber-900 dark:text-amber-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <BellRing className="w-4 h-4 animate-bounce" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  Notificação · Dia Final de Entrega ({formatDatePT(todayDateStr)})
+                </div>
+                <div className="text-sm font-semibold truncate mt-0.5">
+                  {tasksDueToday.length === 1 ? (
+                    <span>Hoje é o dia final para: <strong>{tasksDueToday[0].title}</strong></span>
+                  ) : (
+                    <span>Hoje é o dia final para {tasksDueToday.length} tarefas: {tasksDueToday.map((t) => t.title).join(', ')}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              {notificationPermission !== 'granted' && isNotificationSupported() && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await requestNotificationPermission();
+                    setNotificationPermission(res);
+                    if (res === 'granted') {
+                      checkAndSendDueDateNotifications(tasks);
+                    }
+                  }}
+                  className="px-2.5 py-1 text-xs font-semibold bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-lg transition-colors cursor-pointer"
+                >
+                  Ativar no Navegador
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDate(todayDateStr);
+                  setActiveTab('calendar');
+                }}
+                className="px-2.5 py-1 text-xs font-semibold bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+              >
+                Ver no Calendário
+              </button>
+              <button
+                type="button"
+                onClick={() => setDismissedNotificationToday(true)}
+                className="p-1 text-amber-600 dark:text-amber-400 hover:text-amber-900 dark:hover:text-white rounded-md cursor-pointer"
+                title="Fechar notificação"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* TAB 1: Calendário Mensal e Tarefas com Clientes */}
         {activeTab === 'calendar' && (
           <div className="space-y-3.5 sm:space-y-5">
@@ -843,11 +936,12 @@ export default function App() {
             <AllTasksView
               tasks={tasks}
               allClients={clients}
-              onSelectTask={(task) => setDetailTaskId(task.id)}
+              currentYear={currentYear}
+              currentMonth={currentMonth}
+              onSelectTask={(task) => handleOpenEditTask(task)}
               onOpenNewTask={handleOpenNewTask}
               onOpenEditTask={handleOpenEditTask}
               onDeleteTask={handleDeleteTask}
-              onToggleTaskComplete={handleToggleTaskComplete}
               onQuickChangeDate={handleQuickChangeDate}
               onRestoreFiscalCalendar={handleRestoreFiscalCalendar}
             />

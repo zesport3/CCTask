@@ -71,10 +71,10 @@ export const CalendarMonth: React.FC<CalendarMonthProps> = ({
             <button
               type="button"
               onClick={() => onSelectDate(null)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
             >
               <CalendarDays className="w-3.5 h-3.5" />
-              <span>Ver mês todo</span>
+              <span>Fechar dia</span>
             </button>
           )}
         </div>

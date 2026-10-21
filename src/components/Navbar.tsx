@@ -86,11 +86,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <ListTodo className="w-4 h-4" />
                 <span>Todas as Tarefas</span>
-                {tasksCount > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200">
-                    {tasksCount}
-                  </span>
-                )}
               </button>
             </nav>
 
@@ -194,11 +189,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <div className="relative">
               <ListTodo className={`w-5 h-5 ${activeTab === 'all_tasks' ? 'stroke-[2.5]' : ''}`} />
-              {tasksCount > 0 && (
-                <span className="absolute -top-1 -right-2 px-1 text-[9px] font-bold rounded-full bg-blue-600 text-white">
-                  {tasksCount > 99 ? '99+' : tasksCount}
-                </span>
-              )}
             </div>
             <span className="text-[10px] leading-tight">Tarefas</span>
           </button>
