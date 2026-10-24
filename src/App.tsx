@@ -9,7 +9,7 @@ import { Navbar } from './components/Navbar';
 import { CalendarMonth } from './components/CalendarMonth';
 import { TaskList } from './components/TaskList';
 import { AllTasksView } from './components/AllTasksView';
-import { FiscalCalendarModal } from './components/FiscalCalendarModal';
+import { NotificationGuideModal } from './components/NotificationGuideModal';
 import { TaskDetailModal } from './components/TaskDetailModal';
 import { TaskFormModal } from './components/TaskFormModal';
 import { ClientManagerModal } from './components/ClientManagerModal';
@@ -69,7 +69,7 @@ export default function App() {
   const [presetTaskDate, setPresetTaskDate] = useState<string | undefined>(undefined);
   const [isClientManagerOpen, setIsClientManagerOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
-  const [isFiscalCalendarOpen, setIsFiscalCalendarOpen] = useState(false);
+  const [isNotificationGuideOpen, setIsNotificationGuideOpen] = useState(false);
 
   // Confirmation Dialog State
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -885,7 +885,7 @@ export default function App() {
         onOpenNewTask={() => handleOpenNewTask()}
         onOpenClients={() => setIsClientManagerOpen(true)}
         onOpenBackup={() => setIsBackupModalOpen(true)}
-        onOpenFiscalCalendar={() => setIsFiscalCalendarOpen(true)}
+        onOpenNotificationGuide={() => setIsNotificationGuideOpen(true)}
         saveStatus={saveStatus}
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode((d) => !d)}
@@ -915,6 +915,16 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setIsNotificationGuideOpen(true)}
+                className="px-2.5 py-1 text-xs font-semibold bg-amber-200/90 dark:bg-amber-900/60 hover:bg-amber-300 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                title="Configurar e testar notificações no ecrã de bloqueio do telemóvel"
+              >
+                <BellRing className="w-3.5 h-3.5" />
+                <span>Ecrã de Bloqueio</span>
+              </button>
+
               {notificationPermission !== 'granted' && isNotificationSupported() && (
                 <button
                   type="button"
@@ -927,7 +937,7 @@ export default function App() {
                   }}
                   className="px-2.5 py-1 text-xs font-semibold bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-lg transition-colors cursor-pointer"
                 >
-                  Ativar no Navegador
+                  Ativar
                 </button>
               )}
               <button
@@ -1010,14 +1020,10 @@ export default function App() {
 
       {/* MODALS */}
 
-      {/* 1. Modal do Calendário Fiscal (AT & Segurança Social) */}
-      <FiscalCalendarModal
-        isOpen={isFiscalCalendarOpen}
-        onClose={() => setIsFiscalCalendarOpen(false)}
-        currentTasks={tasks}
-        onLoadAllFiscalTasks={handleRestoreFiscalCalendar}
-        onAddSingleFiscalTask={handleAddSingleFiscalTask}
-        onUpdateFiscalObligation={handleUpdateFiscalObligation}
+      {/* 1. Modal de Guia e Teste de Notificações no Ecrã de Bloqueio */}
+      <NotificationGuideModal
+        isOpen={isNotificationGuideOpen}
+        onClose={() => setIsNotificationGuideOpen(false)}
       />
 
       {/* 2. Painel de Detalhes da Tarefa */}

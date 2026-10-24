@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Calendar as CalendarIcon,
   Plus,
@@ -7,7 +6,7 @@ import {
   Moon,
   Sun,
   ListTodo,
-  Sparkles,
+  Bell,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -18,7 +17,7 @@ interface NavbarProps {
   onOpenNewTask: () => void;
   onOpenClients: () => void;
   onOpenBackup: () => void;
-  onOpenFiscalCalendar: () => void;
+  onOpenNotificationGuide?: () => void;
   saveStatus: { success: boolean; lastSaved?: Date; error?: string };
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
@@ -32,7 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNewTask,
   onOpenClients,
   onOpenBackup,
-  onOpenFiscalCalendar,
+  onOpenNotificationGuide,
   saveStatus,
   isDarkMode,
   onToggleDarkMode,
@@ -91,7 +90,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Top Action Zone */}
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {/* Desktop-only Buttons (Clientes, Fiscal, Backup) */}
+              {/* Desktop-only Buttons (Clientes, Backup) */}
               <div className="hidden sm:flex items-center gap-1.5 sm:gap-2">
                 {/* Clientes */}
                 <button
@@ -109,17 +108,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </button>
 
-                {/* Calendário Fiscal */}
-                <button
-                  type="button"
-                  onClick={onOpenFiscalCalendar}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap cursor-pointer"
-                  title="Obrigações do Calendário Fiscal (AT e Seg. Social)"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Calendário Fiscal</span>
-                </button>
-
                 {/* Cópias de Segurança */}
                 <button
                   type="button"
@@ -130,6 +118,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <HardDrive className="w-4 h-4" />
                 </button>
               </div>
+
+              {/* Notification Guide / Lock screen settings */}
+              {onOpenNotificationGuide && (
+                <button
+                  type="button"
+                  onClick={onOpenNotificationGuide}
+                  className="p-1.5 sm:p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center relative"
+                  aria-label="Notificações no ecrã de bloqueio"
+                  title="Configurar e testar notificações no ecrã de bloqueio do telemóvel"
+                >
+                  <Bell className="w-4 h-4" />
+                </button>
+              )}
 
               {/* Theme Toggle (both mobile and desktop) */}
               <button
@@ -162,7 +163,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         aria-label="Navegação móvel"
         className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 pb-safe transition-colors shadow-lg"
       >
-        <div className="grid grid-cols-5 items-center justify-around h-15 px-1 max-w-lg mx-auto">
+        <div className="grid grid-cols-4 items-center justify-around h-15 px-1 max-w-lg mx-auto">
           {/* 1. Calendário */}
           <button
             type="button"
@@ -210,17 +211,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="text-[10px] leading-tight">Clientes</span>
           </button>
 
-          {/* 4. Fiscal */}
-          <button
-            type="button"
-            onClick={onOpenFiscalCalendar}
-            className="flex flex-col items-center justify-center gap-1 py-1 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer select-none"
-          >
-            <Sparkles className="w-5 h-5 text-amber-500" />
-            <span className="text-[10px] leading-tight">Fiscal</span>
-          </button>
-
-          {/* 5. Cópia/Backup */}
+          {/* 4. Cópia/Backup */}
           <button
             type="button"
             onClick={onOpenBackup}
