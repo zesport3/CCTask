@@ -35,13 +35,10 @@ import {
 } from './utils/fiscalCalendar';
 import { applyClientObligationsToTasks } from './utils/clientTaskUtils';
 import {
-  isNotificationSupported,
-  getNotificationPermission,
-  requestNotificationPermission,
   checkAndSendDueDateNotifications,
-  NotificationPermissionState,
+  getMillisecondsUntilNextTargetTime,
+  isAtOrPastNotificationTime,
 } from './utils/notificationService';
-import { BellRing, X } from 'lucide-react';
 
 export default function App() {
   // Application Data State
@@ -154,30 +151,45 @@ export default function App() {
     }
   }, [currentYear, currentMonth, isLoaded, tasks]);
 
-  // Due date notification state
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(() =>
-    getNotificationPermission()
-  );
-  const [dismissedNotificationToday, setDismissedNotificationToday] = useState(false);
-
-  // Send notification on the final day of tasks (prazos limite hoje)
+  // Send notification on the final day of tasks automatically at 10:00 AM (10h00)
+  // Strict rule: exactly 1 notification per task, NOT per company
   useEffect(() => {
     if (!isLoaded || tasks.length === 0) return;
-    checkAndSendDueDateNotifications(tasks);
 
-    // Periodically check every 15 minutes if app stays open
-    const interval = setInterval(() => {
+    // 1. If currently at or after 10h00 today, send any unsent task notifications immediately
+    if (isAtOrPastNotificationTime(10, 0)) {
       checkAndSendDueDateNotifications(tasks);
-    }, 15 * 60 * 1000);
+    }
 
-    return () => clearInterval(interval);
+    // 2. Schedule a precise timeout for exactly 10:00:00 AM (today if morning, or tomorrow if past 10h)
+    const msUntil10 = getMillisecondsUntilNextTargetTime(10, 0);
+    const timeoutId = setTimeout(() => {
+      checkAndSendDueDateNotifications(tasks);
+    }, msUntil10);
+
+    // 3. Periodic check every 60 seconds (catches if time passed 10h00 while screen was off / tab inactive)
+    const intervalId = setInterval(() => {
+      if (isAtOrPastNotificationTime(10, 0)) {
+        checkAndSendDueDateNotifications(tasks);
+      }
+    }, 60 * 1000);
+
+    // 4. Trigger on phone unlock or app tab focus if past 10h00
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible' && isAtOrPastNotificationTime(10, 0)) {
+        checkAndSendDueDateNotifications(tasks);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+    };
   }, [tasks, isLoaded]);
-
-  const todayDateStr = getTodayDateString();
-  const tasksDueToday = React.useMemo(() => {
-    if (!isLoaded) return [];
-    return tasks.filter((t) => t.date === todayDateStr);
-  }, [tasks, isLoaded, todayDateStr]);
 
   // Current task selected for details (reactive to tasks changes)
   const activeDetailTask = tasks.find((t) => t.id === detailTaskId) || null;
@@ -893,75 +905,6 @@ export default function App() {
 
       {/* Main Content Area - padded at bottom on mobile for bottom navigation bar */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-6 pb-24 sm:pb-8 space-y-3.5 sm:space-y-6">
-        {/* Banner de Notificação: Dia Final da Tarefa */}
-        {tasksDueToday.length > 0 && !dismissedNotificationToday && (
-          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl p-3 sm:p-4 text-amber-900 dark:text-amber-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
-            <div className="flex items-start sm:items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-                <BellRing className="w-4 h-4 animate-bounce" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                  Notificação · Dia Final de Entrega ({formatDatePT(todayDateStr)})
-                </div>
-                <div className="text-sm font-semibold truncate mt-0.5">
-                  {tasksDueToday.length === 1 ? (
-                    <span>Hoje é o dia final para: <strong>{tasksDueToday[0].title}</strong></span>
-                  ) : (
-                    <span>Hoje é o dia final para {tasksDueToday.length} tarefas: {tasksDueToday.map((t) => t.title).join(', ')}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-              <button
-                type="button"
-                onClick={() => setIsNotificationGuideOpen(true)}
-                className="px-2.5 py-1 text-xs font-semibold bg-amber-200/90 dark:bg-amber-900/60 hover:bg-amber-300 dark:hover:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                title="Configurar e testar notificações no ecrã de bloqueio do telemóvel"
-              >
-                <BellRing className="w-3.5 h-3.5" />
-                <span>Ecrã de Bloqueio</span>
-              </button>
-
-              {notificationPermission !== 'granted' && isNotificationSupported() && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const res = await requestNotificationPermission();
-                    setNotificationPermission(res);
-                    if (res === 'granted') {
-                      checkAndSendDueDateNotifications(tasks);
-                    }
-                  }}
-                  className="px-2.5 py-1 text-xs font-semibold bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-lg transition-colors cursor-pointer"
-                >
-                  Ativar
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDate(todayDateStr);
-                  setActiveTab('calendar');
-                }}
-                className="px-2.5 py-1 text-xs font-semibold bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
-              >
-                Ver no Calendário
-              </button>
-              <button
-                type="button"
-                onClick={() => setDismissedNotificationToday(true)}
-                className="p-1 text-amber-600 dark:text-amber-400 hover:text-amber-900 dark:hover:text-white rounded-md cursor-pointer"
-                title="Fechar notificação"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* TAB 1: Calendário Mensal e Tarefas com Clientes */}
         {activeTab === 'calendar' && (
           <div className="space-y-3.5 sm:space-y-5">

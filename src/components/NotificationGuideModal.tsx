@@ -158,6 +158,25 @@ export const NotificationGuideModal: React.FC<NotificationGuideModalProps> = ({
             )}
           </div>
 
+          {/* Regras de Envio Automático */}
+          <div className="p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/60 dark:bg-indigo-950/30 space-y-2">
+            <div className="flex items-center gap-2 text-indigo-950 dark:text-indigo-200 font-bold text-xs sm:text-sm">
+              <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
+              <span>Regras de Notificação Automática</span>
+            </div>
+            <ul className="text-xs text-indigo-900/90 dark:text-indigo-200/90 space-y-1.5 list-disc list-inside">
+              <li>
+                <strong>Disparo às 10h00:</strong> As notificações são enviadas automaticamente às 10:00 da manhã no dia em que as tarefas vencem.
+              </li>
+              <li>
+                <strong>Formato:</strong> <em>“Dia 5 de outubro - Envio do SAF-T”</em>.
+              </li>
+              <li>
+                <strong>1 notificação por tarefa:</strong> Não são enviadas notificações repetidas por cada empresa. É emitida exatamente uma notificação por tarefa com o resumo de todas as empresas associadas.
+              </li>
+            </ul>
+          </div>
+
           {/* Test Button Card */}
           <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/70 dark:bg-blue-950/30 space-y-2.5">
             <div className="flex items-center gap-2 text-blue-900 dark:text-blue-300 font-bold text-xs sm:text-sm">

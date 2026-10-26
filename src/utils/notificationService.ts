@@ -1,7 +1,56 @@
 import { AccountingTask } from '../types/accounting';
-import { getTodayDateString, formatDatePT } from './dateUtils';
+import { getTodayDateString, formatDatePT, PT_MONTHS } from './dateUtils';
 
 export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
+
+export interface CheckNotificationOptions {
+  targetHour?: number;   // Default: 10 (10:00 AM)
+  targetMinute?: number; // Default: 0
+  forceNow?: boolean;    // Skip time check if manually triggered
+}
+
+/**
+ * Checks whether current local time is at or after targetHour:targetMinute today.
+ */
+export function isAtOrPastNotificationTime(targetHour: number = 10, targetMinute: number = 0): boolean {
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  if (currentHour > targetHour) return true;
+  if (currentHour === targetHour && currentMinute >= targetMinute) return true;
+  return false;
+}
+
+/**
+ * Calculates milliseconds until the next targetHour:targetMinute.
+ * If target time has already passed today, returns milliseconds until tomorrow at that time.
+ */
+export function getMillisecondsUntilNextTargetTime(targetHour: number = 10, targetMinute: number = 0): number {
+  const now = new Date();
+  let target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), targetHour, targetMinute, 0, 0);
+  if (now.getTime() >= target.getTime()) {
+    // If past target today, schedule for tomorrow
+    target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, targetHour, targetMinute, 0, 0);
+  }
+  return target.getTime() - now.getTime();
+}
+
+/**
+ * Formats notification title following user format: "Dia 5 de outubro - [Nome da Tarefa]"
+ * e.g., "Dia 5 de outubro - Envio do SAF-T"
+ */
+export function formatTaskNotificationTitle(task: AccountingTask): string {
+  if (task.date && task.date.includes('-')) {
+    const [, monthStr, dayStr] = task.date.split('-');
+    const day = parseInt(dayStr, 10);
+    const monthIdx = parseInt(monthStr, 10) - 1;
+    const monthName = PT_MONTHS[monthIdx] ? PT_MONTHS[monthIdx].toLowerCase() : '';
+    if (monthName) {
+      return `Dia ${day} de ${monthName} - ${task.title}`;
+    }
+  }
+  return `Dia limite hoje - ${task.title}`;
+}
 
 /**
  * Checks if HTML5 Web Notifications are supported in the current environment
@@ -102,12 +151,24 @@ export async function dispatchLockScreenNotification(
 
 /**
  * Checks all tasks and dispatches a notification for each task whose final day is today.
- * Prevents duplicate notifications on the same day by recording timestamps in localStorage.
+ * STRICT RULES:
+ * 1. Dispatches automatically at 10h00 (or if opened after 10h00 on the day of the task).
+ * 2. Format: "Dia 5 de outubro - [Nome da Tarefa]"
+ * 3. Exactly ONE notification per task (NEVER per client/company).
+ * 4. Prevents duplicate notifications on the same day by recording timestamps in localStorage.
  */
-export async function checkAndSendDueDateNotifications(tasks: AccountingTask[]): Promise<{
+export async function checkAndSendDueDateNotifications(
+  tasks: AccountingTask[],
+  options?: CheckNotificationOptions
+): Promise<{
   tasksDueToday: AccountingTask[];
   sentNotificationsCount: number;
+  skippedReason?: string;
 }> {
+  const targetHour = options?.targetHour ?? 10;
+  const targetMinute = options?.targetMinute ?? 0;
+  const forceNow = options?.forceNow ?? false;
+
   const todayStr = getTodayDateString();
   const tasksDue = getTasksDueToday(tasks);
 
@@ -115,26 +176,46 @@ export async function checkAndSendDueDateNotifications(tasks: AccountingTask[]):
     return { tasksDueToday: [], sentNotificationsCount: 0 };
   }
 
+  // 1. Time restriction: Must be >= 10h00 (unless forced by manual action)
+  if (!forceNow && !isAtOrPastNotificationTime(targetHour, targetMinute)) {
+    return {
+      tasksDueToday: tasksDue,
+      sentNotificationsCount: 0,
+      skippedReason: `Agendado para as ${String(targetHour).padStart(2, '0')}h${String(targetMinute).padStart(2, '0')}`,
+    };
+  }
+
   let sentCount = 0;
   const permission = getNotificationPermission();
 
   if (permission === 'granted') {
+    // 2. Strict Rule: ONE notification per task, NOT per client/company
     for (const task of tasksDue) {
-      const storageKey = `contab_notif_${todayStr}_${task.id}`;
-      const alreadyNotified = localStorage.getItem(storageKey);
+      const storageKey = `contab_notif_10h_${todayStr}_${task.id}`;
+      const legacyKey = `contab_notif_${todayStr}_${task.id}`;
+      const alreadyNotified = localStorage.getItem(storageKey) || localStorage.getItem(legacyKey);
 
       if (!alreadyNotified) {
+        // Title format requested: "dia 5 outubro - envio saft"
+        const title = formatTaskNotificationTitle(task);
+
         const totalClients = task.clients.length;
         const doneClients = task.clients.filter((c) => c.status === 'done').length;
+        const pendingClients = totalClients - doneClients;
 
-        const bodyText =
-          totalClients > 0
-            ? `${doneClients}/${totalClients} clientes concluídos. Hoje é o dia limite!`
-            : `Hoje (${formatDatePT(todayStr)}) é o dia limite para esta tarefa.`;
+        let bodyText = '';
+        if (totalClients === 0) {
+          bodyText = 'Prazo limite hoje para cumprimento desta tarefa.';
+        } else if (pendingClients === 0) {
+          bodyText = `Todas as ${totalClients} ${totalClients === 1 ? 'empresa concluída' : 'empresas concluídas'}. Prazo limite hoje!`;
+        } else {
+          bodyText = `${pendingClients} de ${totalClients} ${totalClients === 1 ? 'empresa pendente' : 'empresas pendentes'}. Prazo limite hoje!`;
+        }
 
-        const sent = await dispatchLockScreenNotification(`Prazo Final Hoje: ${task.title}`, {
+        const sent = await dispatchLockScreenNotification(title, {
           body: bodyText,
-          tag: `due_${task.id}_${todayStr}`,
+          tag: `due_task_${task.id}_${todayStr}`,
+          data: { taskId: task.id, date: task.date },
         });
 
         if (sent) {
