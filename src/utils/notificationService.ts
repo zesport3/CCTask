@@ -4,7 +4,7 @@ import { getTodayDateString, formatDatePT, PT_MONTHS } from './dateUtils';
 export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
 
 export interface CheckNotificationOptions {
-  targetHour?: number;   // Default: 10 (10:00 AM)
+  targetHour?: number;   // Default: 9 (09:00 AM)
   targetMinute?: number; // Default: 0
   forceNow?: boolean;    // Skip time check if manually triggered
 }
@@ -12,7 +12,7 @@ export interface CheckNotificationOptions {
 /**
  * Checks whether current local time is at or after targetHour:targetMinute today.
  */
-export function isAtOrPastNotificationTime(targetHour: number = 10, targetMinute: number = 0): boolean {
+export function isAtOrPastNotificationTime(targetHour: number = 9, targetMinute: number = 0): boolean {
   const now = new Date();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
@@ -25,7 +25,7 @@ export function isAtOrPastNotificationTime(targetHour: number = 10, targetMinute
  * Calculates milliseconds until the next targetHour:targetMinute.
  * If target time has already passed today, returns milliseconds until tomorrow at that time.
  */
-export function getMillisecondsUntilNextTargetTime(targetHour: number = 10, targetMinute: number = 0): number {
+export function getMillisecondsUntilNextTargetTime(targetHour: number = 9, targetMinute: number = 0): number {
   const now = new Date();
   let target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), targetHour, targetMinute, 0, 0);
   if (now.getTime() >= target.getTime()) {
@@ -33,6 +33,20 @@ export function getMillisecondsUntilNextTargetTime(targetHour: number = 10, targ
     target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, targetHour, targetMinute, 0, 0);
   }
   return target.getTime() - now.getTime();
+}
+
+/**
+ * Checks if the browser supports native scheduled triggers (Notification Triggers API).
+ * When supported by Chromium/Android, the OS alarm manager fires the notification
+ * at the exact scheduled timestamp even if the web app/browser is closed!
+ */
+export function isNotificationTriggerSupported(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof Notification !== 'undefined' &&
+    'showTrigger' in Notification.prototype &&
+    typeof (window as unknown as { TimestampTrigger?: unknown }).TimestampTrigger !== 'undefined'
+  );
 }
 
 /**
@@ -106,6 +120,7 @@ export async function dispatchLockScreenNotification(
     body: string;
     tag?: string;
     data?: unknown;
+    showTriggerTimestamp?: number;
   }
 ): Promise<boolean> {
   const permission = getNotificationPermission();
@@ -122,6 +137,16 @@ export async function dispatchLockScreenNotification(
     data: options.data,
   };
 
+  // If a scheduled timestamp is provided and the browser supports Notification Triggers API
+  if (options.showTriggerTimestamp && isNotificationTriggerSupported()) {
+    try {
+      const TimestampTriggerClass = (window as unknown as { TimestampTrigger: new (ts: number) => unknown }).TimestampTrigger;
+      notifOptions.showTrigger = new TimestampTriggerClass(options.showTriggerTimestamp);
+    } catch (e) {
+      console.warn('Não foi possível instanciar TimestampTrigger:', e);
+    }
+  }
+
   // 1. Try Service Worker first (required to display on Mobile Lock Screen)
   try {
     if ('serviceWorker' in navigator) {
@@ -135,24 +160,28 @@ export async function dispatchLockScreenNotification(
     console.warn('ServiceWorker showNotification indisponível, a tentar fallback:', swErr);
   }
 
-  // 2. Fallback to standard window Notification
-  try {
-    const notif = new Notification(title, notifOptions);
-    notif.onclick = () => {
-      window.focus();
-      notif.close();
-    };
-    return true;
-  } catch (err) {
-    console.warn('Não foi possível enviar notificação nativa:', err);
-    return false;
+  // 2. Fallback to standard window Notification (only if not a future trigger)
+  if (!options.showTriggerTimestamp) {
+    try {
+      const notif = new Notification(title, notifOptions);
+      notif.onclick = () => {
+        window.focus();
+        notif.close();
+      };
+      return true;
+    } catch (err) {
+      console.warn('Não foi possível enviar notificação nativa:', err);
+      return false;
+    }
   }
+
+  return false;
 }
 
 /**
  * Checks all tasks and dispatches a notification for each task whose final day is today.
  * STRICT RULES:
- * 1. Dispatches automatically at 10h00 (or if opened after 10h00 on the day of the task).
+ * 1. Dispatches automatically at 9h00 (or if opened after 9h00 on the day of the task).
  * 2. Format: "Dia 5 de outubro - [Nome da Tarefa]"
  * 3. Exactly ONE notification per task (NEVER per client/company).
  * 4. Prevents duplicate notifications on the same day by recording timestamps in localStorage.
@@ -165,7 +194,7 @@ export async function checkAndSendDueDateNotifications(
   sentNotificationsCount: number;
   skippedReason?: string;
 }> {
-  const targetHour = options?.targetHour ?? 10;
+  const targetHour = options?.targetHour ?? 9;
   const targetMinute = options?.targetMinute ?? 0;
   const forceNow = options?.forceNow ?? false;
 
@@ -176,7 +205,7 @@ export async function checkAndSendDueDateNotifications(
     return { tasksDueToday: [], sentNotificationsCount: 0 };
   }
 
-  // 1. Time restriction: Must be >= 10h00 (unless forced by manual action)
+  // 1. Time restriction: Must be >= 09h00 (unless forced by manual action)
   if (!forceNow && !isAtOrPastNotificationTime(targetHour, targetMinute)) {
     return {
       tasksDueToday: tasksDue,
@@ -191,9 +220,13 @@ export async function checkAndSendDueDateNotifications(
   if (permission === 'granted') {
     // 2. Strict Rule: ONE notification per task, NOT per client/company
     for (const task of tasksDue) {
-      const storageKey = `contab_notif_10h_${todayStr}_${task.id}`;
+      const storageKey = `contab_notif_9h_${todayStr}_${task.id}`;
+      const legacyKey10 = `contab_notif_10h_${todayStr}_${task.id}`;
       const legacyKey = `contab_notif_${todayStr}_${task.id}`;
-      const alreadyNotified = localStorage.getItem(storageKey) || localStorage.getItem(legacyKey);
+      const alreadyNotified =
+        localStorage.getItem(storageKey) ||
+        localStorage.getItem(legacyKey10) ||
+        localStorage.getItem(legacyKey);
 
       if (!alreadyNotified) {
         // Title format requested: "dia 5 outubro - envio saft"
@@ -227,6 +260,94 @@ export async function checkAndSendDueDateNotifications(
   }
 
   return { tasksDueToday: tasksDue, sentNotificationsCount: sentCount };
+}
+
+/**
+ * Pre-schedules native OS alarms for upcoming tasks (and today's tasks if before 9:00 AM)
+ * using Notification Triggers API (showTrigger: new TimestampTrigger(...)) when supported.
+ * This instructs the mobile operating system (e.g. Android) to ring at exactly 09:00 AM
+ * on each task's due date, even if the PWA / browser is closed!
+ */
+export async function scheduleUpcomingNotifications(
+  tasks: AccountingTask[],
+  targetHour: number = 9,
+  targetMinute: number = 0
+): Promise<number> {
+  const permission = getNotificationPermission();
+  if (permission !== 'granted') return 0;
+  if (!isServiceWorkerSupported()) return 0;
+
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (!reg || !('showNotification' in reg)) return 0;
+
+    const isTriggerSupported = isNotificationTriggerSupported();
+    const TimestampTriggerClass = isTriggerSupported
+      ? (window as unknown as { TimestampTrigger: new (ts: number) => unknown }).TimestampTrigger
+      : null;
+
+    let scheduledCount = 0;
+    const now = new Date();
+
+    // Look for upcoming tasks within the next 30 days
+    const upcomingTasks = tasks.filter((t) => {
+      if (!t.date || !t.date.includes('-')) return false;
+      const [y, m, d] = t.date.split('-').map((v) => parseInt(v, 10));
+      const task9AM = new Date(y, m - 1, d, targetHour, targetMinute, 0, 0);
+      return task9AM.getTime() > now.getTime();
+    });
+
+    for (const task of upcomingTasks) {
+      const [y, m, d] = task.date.split('-').map((v) => parseInt(v, 10));
+      const targetTime = new Date(y, m - 1, d, targetHour, targetMinute, 0, 0);
+
+      // Only schedule tasks up to 30 days ahead
+      const msDiff = targetTime.getTime() - now.getTime();
+      if (msDiff > 30 * 24 * 60 * 60 * 1000) continue;
+
+      const scheduleKey = `contab_sched_trigger_${task.id}_${task.date}`;
+      if (localStorage.getItem(scheduleKey)) continue;
+
+      const title = formatTaskNotificationTitle(task);
+      const totalClients = task.clients.length;
+      const doneClients = task.clients.filter((c) => c.status === 'done').length;
+      const pendingClients = totalClients - doneClients;
+
+      let bodyText = '';
+      if (totalClients === 0) {
+        bodyText = 'Prazo limite hoje para cumprimento desta tarefa.';
+      } else if (pendingClients === 0) {
+        bodyText = `Todas as ${totalClients} ${totalClients === 1 ? 'empresa concluída' : 'empresas concluídas'}. Prazo limite hoje!`;
+      } else {
+        bodyText = `${pendingClients} de ${totalClients} ${totalClients === 1 ? 'empresa pendente' : 'empresas pendentes'}. Prazo limite hoje!`;
+      }
+
+      if (TimestampTriggerClass) {
+        try {
+          await reg.showNotification(title, {
+            body: bodyText,
+            tag: `due_task_${task.id}_${task.date}`,
+            icon: './pwa-192x192.png',
+            badge: './pwa-192x192.png',
+            vibrate: [200, 100, 200],
+            renotify: true,
+            data: { taskId: task.id, date: task.date },
+            showTrigger: new TimestampTriggerClass(targetTime.getTime()),
+          } as NotificationOptions & Record<string, unknown>);
+
+          localStorage.setItem(scheduleKey, targetTime.toISOString());
+          scheduledCount++;
+        } catch (err) {
+          console.warn('Erro ao agendar trigger para tarefa:', task.title, err);
+        }
+      }
+    }
+
+    return scheduledCount;
+  } catch (err) {
+    console.warn('Não foi possível agendar triggers de notificação:', err);
+    return 0;
+  }
 }
 
 /**

@@ -36,6 +36,7 @@ import {
 import { applyClientObligationsToTasks } from './utils/clientTaskUtils';
 import {
   checkAndSendDueDateNotifications,
+  scheduleUpcomingNotifications,
   getMillisecondsUntilNextTargetTime,
   isAtOrPastNotificationTime,
 } from './utils/notificationService';
@@ -151,33 +152,41 @@ export default function App() {
     }
   }, [currentYear, currentMonth, isLoaded, tasks]);
 
-  // Send notification on the final day of tasks automatically at 10:00 AM (10h00)
+  // Send notification on the final day of tasks automatically at 09:00 AM (09h00)
   // Strict rule: exactly 1 notification per task, NOT per company
   useEffect(() => {
     if (!isLoaded || tasks.length === 0) return;
 
-    // 1. If currently at or after 10h00 today, send any unsent task notifications immediately
-    if (isAtOrPastNotificationTime(10, 0)) {
-      checkAndSendDueDateNotifications(tasks);
+    // 1. Pre-schedule native OS alarms (Notification Triggers) for all upcoming tasks at 09h00
+    // (This allows Android/Chromium OS alarm manager to fire even when the app is closed!)
+    scheduleUpcomingNotifications(tasks, 9, 0);
+
+    // 2. If currently at or after 09h00 today, send any unsent task notifications immediately
+    if (isAtOrPastNotificationTime(9, 0)) {
+      checkAndSendDueDateNotifications(tasks, { targetHour: 9, targetMinute: 0 });
     }
 
-    // 2. Schedule a precise timeout for exactly 10:00:00 AM (today if morning, or tomorrow if past 10h)
-    const msUntil10 = getMillisecondsUntilNextTargetTime(10, 0);
+    // 3. Schedule a precise timeout for exactly 09:00:00 AM (today if before 9h, or tomorrow if past 9h)
+    const msUntil9 = getMillisecondsUntilNextTargetTime(9, 0);
     const timeoutId = setTimeout(() => {
-      checkAndSendDueDateNotifications(tasks);
-    }, msUntil10);
+      checkAndSendDueDateNotifications(tasks, { targetHour: 9, targetMinute: 0 });
+      scheduleUpcomingNotifications(tasks, 9, 0);
+    }, msUntil9);
 
-    // 3. Periodic check every 60 seconds (catches if time passed 10h00 while screen was off / tab inactive)
+    // 4. Periodic check every 60 seconds (catches if time passed 09h00 while screen was off / tab inactive)
     const intervalId = setInterval(() => {
-      if (isAtOrPastNotificationTime(10, 0)) {
-        checkAndSendDueDateNotifications(tasks);
+      if (isAtOrPastNotificationTime(9, 0)) {
+        checkAndSendDueDateNotifications(tasks, { targetHour: 9, targetMinute: 0 });
       }
     }, 60 * 1000);
 
-    // 4. Trigger on phone unlock or app tab focus if past 10h00
+    // 5. Trigger on phone unlock or app tab focus if past 09h00
     const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible' && isAtOrPastNotificationTime(10, 0)) {
-        checkAndSendDueDateNotifications(tasks);
+      if (document.visibilityState === 'visible') {
+        scheduleUpcomingNotifications(tasks, 9, 0);
+        if (isAtOrPastNotificationTime(9, 0)) {
+          checkAndSendDueDateNotifications(tasks, { targetHour: 9, targetMinute: 0 });
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);

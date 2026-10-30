@@ -166,13 +166,16 @@ export const NotificationGuideModal: React.FC<NotificationGuideModalProps> = ({
             </div>
             <ul className="text-xs text-indigo-900/90 dark:text-indigo-200/90 space-y-1.5 list-disc list-inside">
               <li>
-                <strong>Disparo às 10h00:</strong> As notificações são enviadas automaticamente às 10:00 da manhã no dia em que as tarefas vencem.
+                <strong>Disparo às 09h00:</strong> As notificações são programadas para disparar às 09:00 da manhã no dia em que as tarefas vencem.
+              </li>
+              <li>
+                <strong>Pré-Agendamento no Sistema:</strong> As tarefas dos próximos dias ficam pré-agendadas nos alarmes nativos do telemóvel para tocar às 09h mesmo com o ecrã desligado.
               </li>
               <li>
                 <strong>Formato:</strong> <em>“Dia 5 de outubro - Envio do SAF-T”</em>.
               </li>
               <li>
-                <strong>1 notificação por tarefa:</strong> Não são enviadas notificações repetidas por cada empresa. É emitida exatamente uma notificação por tarefa com o resumo de todas as empresas associadas.
+                <strong>1 notificação por tarefa:</strong> É emitida exatamente uma notificação consolidada por tarefa, nunca repetida por empresa.
               </li>
             </ul>
           </div>
@@ -214,7 +217,7 @@ export const NotificationGuideModal: React.FC<NotificationGuideModalProps> = ({
           <div className="space-y-3 pt-1">
             <h3 className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-slate-500" />
-              <span>Instruções por Telemóvel</span>
+              <span>Garantir que toca às 09h mesmo sem abrir a aplicação</span>
             </h3>
 
             {/* Android */}
@@ -224,9 +227,9 @@ export const NotificationGuideModal: React.FC<NotificationGuideModalProps> = ({
                 <span>Telemóveis Android (Chrome, Samsung Internet, Edge)</span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                1. Clica em <strong>Ativar Notificações</strong> e confirma com <em>"Permitir"</em>.<br />
-                2. Para melhor experiência, toca nos três pontinhos do navegador e escolhe <strong>"Instalar aplicação"</strong> ou <strong>"Adicionar ao ecrã inicial"</strong>.<br />
-                3. As notificações passam a despertar o ecrã e aparecer no <strong>ecrã de bloqueio com som e vibração</strong> no dia limite de cada tarefa.
+                1. <strong>Instalar:</strong> No Chrome, toca no menu (3 pontinhos) e escolhe <strong>"Instalar aplicação"</strong>.<br />
+                2. <strong>Bateria sem restrições (Importante):</strong> Vai a <em>Definições do Android &gt; Aplicações &gt; ContabTarefas (ou Chrome) &gt; Bateria</em> e marca como <strong>"Sem restrições"</strong> (ou desliga <em>"Otimização de Bateria"</em>). Isto impede o Android de adormecer o despertador às 09h00!<br />
+                3. A notificação tocará às <strong>09h00</strong> diretamente no ecrã de bloqueio com som e vibração.
               </p>
             </div>
 
@@ -237,11 +240,9 @@ export const NotificationGuideModal: React.FC<NotificationGuideModalProps> = ({
                 <span>iPhone / iPad (iOS 16.4 ou superior)</span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-                No iPhone, a Apple exige que a aplicação seja adicionada ao ecrã principal para enviar notificações no ecrã de bloqueio:<br />
-                1. No <strong>Safari</strong>, toca no botão de <strong>Partilhar</strong> (ícone do quadrado com a seta para cima <Share className="w-3.5 h-3.5 inline mx-0.5 text-blue-500" />).<br />
-                2. Rola para baixo e escolhe <strong>"Adicionar ao Ecrã Principal"</strong> (<PlusSquare className="w-3.5 h-3.5 inline mx-0.5 text-slate-600 dark:text-slate-300" />).<br />
-                3. Abre a aplicação a partir do teu ecrã principal e clica em <strong>Permitir Notificações</strong>.<br />
-                4. As notificações de tarefas no dia final surgirão diretamente no <strong>ecrã bloqueado do iPhone</strong> como qualquer app da App Store!
+                1. No <strong>Safari</strong>, toca em <strong>Partilhar</strong> (<Share className="w-3.5 h-3.5 inline mx-0.5 text-blue-500" />) e escolhe <strong>"Adicionar ao Ecrã Principal"</strong> (<PlusSquare className="w-3.5 h-3.5 inline mx-0.5 text-slate-600 dark:text-slate-300" />).<br />
+                2. Abre o ícone adicionado e aceita a permissão de notificações.<br />
+                3. <strong>Dica iOS:</strong> Deixa a aplicação aberta na gaveta de apps recentes (em segundo plano, sem forçar fechar deslizando para cima) para que o temporizador das <strong>09h00</strong> desperte o ecrã com fiabilidade.
               </p>
             </div>
           </div>
