@@ -135,6 +135,10 @@ export async function dispatchLockScreenNotification(
     renotify: true,
     requireInteraction: false,
     data: options.data,
+    actions: [
+      { action: 'mark_done', title: '✅ Concluir' },
+      { action: 'open_task', title: '🔍 Ver Tarefa' },
+    ],
   };
 
   // If a scheduled timestamp is provided and the browser supports Notification Triggers API
@@ -167,6 +171,9 @@ export async function dispatchLockScreenNotification(
       notif.onclick = () => {
         window.focus();
         notif.close();
+        if (options.data && typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('app_open_task', { detail: options.data }));
+        }
       };
       return true;
     } catch (err) {
@@ -333,6 +340,10 @@ export async function scheduleUpcomingNotifications(
             renotify: true,
             data: { taskId: task.id, date: task.date },
             showTrigger: new TimestampTriggerClass(targetTime.getTime()),
+            actions: [
+              { action: 'mark_done', title: '✅ Concluir' },
+              { action: 'open_task', title: '🔍 Ver Tarefa' },
+            ],
           } as NotificationOptions & Record<string, unknown>);
 
           localStorage.setItem(scheduleKey, targetTime.toISOString());

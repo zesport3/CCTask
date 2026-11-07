@@ -200,6 +200,79 @@ export default function App() {
     };
   }, [tasks, isLoaded]);
 
+  // Handle notification clicks & action buttons ('mark_done', 'open') directly
+  useEffect(() => {
+    if (!isLoaded || tasks.length === 0) return;
+
+    const handleAction = (taskId: string, action?: string, date?: string) => {
+      const targetTask = tasks.find((t) => t.id === taskId);
+      if (!targetTask) return;
+
+      if (date) {
+        setSelectedDate(date);
+      } else if (targetTask.date) {
+        setSelectedDate(targetTask.date);
+      }
+
+      if (action === 'mark_done') {
+        const nowIso = new Date().toISOString();
+        if (targetTask.clients.length === 0) {
+          setTasks((prev) =>
+            prev.map((t) => (t.id === targetTask.id ? { ...t, isCompleted: true, updatedAt: nowIso } : t))
+          );
+        } else {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === targetTask.id
+                ? {
+                    ...t,
+                    isCompleted: true,
+                    clients: t.clients.map((c) => ({ ...c, status: 'done' })),
+                    updatedAt: nowIso,
+                  }
+                : t
+            )
+          );
+        }
+      } else {
+        setDetailTaskId(targetTask.id);
+      }
+    };
+
+    // 1. Check URL parameters (when opened from notification click or action)
+    const params = new URLSearchParams(window.location.search);
+    const paramTaskId = params.get('openTask');
+    const paramAction = params.get('action');
+    const paramDate = params.get('date');
+    if (paramTaskId) {
+      handleAction(paramTaskId, paramAction || undefined, paramDate || undefined);
+      // Clean URL search params without reload
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // 2. Listen to Service Worker message
+    const onSwMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'NOTIFICATION_ACTION' && event.data.taskId) {
+        handleAction(event.data.taskId, event.data.action, event.data.date);
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', onSwMessage);
+
+    // 3. Listen to window CustomEvent (fallback)
+    const onCustomEvent = (event: Event) => {
+      const ce = event as CustomEvent;
+      if (ce.detail?.taskId) {
+        handleAction(ce.detail.taskId, ce.detail.action, ce.detail.date);
+      }
+    };
+    window.addEventListener('app_open_task', onCustomEvent);
+
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', onSwMessage);
+      window.removeEventListener('app_open_task', onCustomEvent);
+    };
+  }, [isLoaded, tasks]);
+
   // Current task selected for details (reactive to tasks changes)
   const activeDetailTask = tasks.find((t) => t.id === detailTaskId) || null;
 
@@ -451,6 +524,7 @@ export default function App() {
       const newStatus: ClientTaskStatus = allDone ? 'in_progress' : 'done';
       const updated: AccountingTask = {
         ...task,
+        isCompleted: !allDone,
         clients: task.clients.map((c) => ({ ...c, status: newStatus })),
         updatedAt: nowIso,
       };
@@ -896,7 +970,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors overflow-x-hidden">
       {/* Top Navbar & Mobile Bottom Bar */}
       <Navbar
         activeTab={activeTab}
@@ -912,11 +986,11 @@ export default function App() {
         onToggleDarkMode={() => setIsDarkMode((d) => !d)}
       />
 
-      {/* Main Content Area - padded at bottom on mobile for bottom navigation bar */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-3 sm:py-6 pb-24 sm:pb-8 space-y-3.5 sm:space-y-6">
+      {/* Main Content Area - optimized to fit cleanly on one page on mobile */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-2 sm:px-6 py-2 sm:py-6 pb-20 sm:pb-8 space-y-2.5 sm:space-y-6">
         {/* TAB 1: Calendário Mensal e Tarefas com Clientes */}
         {activeTab === 'calendar' && (
-          <div className="space-y-3.5 sm:space-y-5">
+          <div className="space-y-2.5 sm:space-y-5">
             <section aria-label="Calendário Mensal">
               <CalendarMonth
                 currentYear={currentYear}

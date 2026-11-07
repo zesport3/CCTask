@@ -60,21 +60,21 @@ export const CalendarMonth: React.FC<CalendarMonthProps> = ({
   }, [calendarDays, selectedDate]);
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs p-3 sm:p-5 transition-colors">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs p-2 sm:p-5 transition-colors">
       {/* Calendar Header with Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3 sm:mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5 mb-1.5 sm:mb-4 pb-2 sm:pb-3 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2 flex-wrap justify-between sm:justify-start w-full sm:w-auto">
-          <h2 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white capitalize">
+          <h2 className="text-base sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white capitalize">
             {formatMonthYearPT(currentYear, currentMonth)}
           </h2>
           {selectedDate && (
             <button
               type="button"
               onClick={() => onSelectDate(null)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] sm:text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
             >
-              <CalendarDays className="w-3.5 h-3.5" />
-              <span>Fechar dia</span>
+              <CalendarDays className="w-3 h-3" />
+              <span>Ver mês</span>
             </button>
           )}
         </div>
@@ -84,44 +84,44 @@ export const CalendarMonth: React.FC<CalendarMonthProps> = ({
           <button
             type="button"
             onClick={onPrevMonth}
-            className="p-1.5 sm:p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer min-w-[36px] flex items-center justify-center"
+            className="p-1 sm:p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer min-w-[32px] sm:min-w-[36px] flex items-center justify-center"
             title="Mês anterior"
             aria-label="Mês anterior"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
           <button
             type="button"
             onClick={onCurrentMonth}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer min-h-[36px]"
+            className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer min-h-[32px] sm:min-h-[36px]"
             title="Voltar ao mês atual"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>Hoje</span>
           </button>
 
           <button
             type="button"
             onClick={onNextMonth}
-            className="p-1.5 sm:p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer min-w-[36px] flex items-center justify-center"
+            className="p-1 sm:p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer min-w-[32px] sm:min-w-[36px] flex items-center justify-center"
             title="Mês seguinte"
             aria-label="Mês seguinte"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
       {/* Selected Day Holiday Banner: When user clicks on a day, show the holiday name */}
       {selectedDay?.holidayName && (
-        <div className="mb-3.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-base shrink-0">
+        <div className="mb-2 sm:mb-3.5 p-2 sm:p-3 rounded-lg sm:rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 flex items-center justify-between gap-2 sm:gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xs sm:text-base shrink-0">
               🎉
             </span>
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
+              <div className="text-[10px] sm:text-[11px] font-semibold text-rose-600 dark:text-rose-400 uppercase tracking-wider">
                 Feriado em {formatDatePT(selectedDate!)}
               </div>
               <div className="font-bold text-rose-900 dark:text-rose-100 text-xs sm:text-sm truncate">
@@ -129,20 +129,20 @@ export const CalendarMonth: React.FC<CalendarMonthProps> = ({
               </div>
             </div>
           </div>
-          <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 px-2 py-0.5 bg-rose-100/80 dark:bg-rose-900/50 rounded-md shrink-0">
-            Feriado Nacional
+          <span className="text-[10px] sm:text-[11px] font-semibold text-rose-700 dark:text-rose-300 px-2 py-0.5 bg-rose-100/80 dark:bg-rose-900/50 rounded-md shrink-0">
+            Feriado
           </span>
         </div>
       )}
 
       {/* Weekday Labels (Seg a Dom) */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1.5 sm:mb-2 text-center text-xs font-semibold">
+      <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-1 sm:mb-2 text-center text-xs font-semibold">
         {PT_WEEKDAYS.map((day, idx) => {
           const isWeekend = idx >= 5;
           return (
             <div
               key={day}
-              className={`py-1 uppercase tracking-wider text-[10px] sm:text-[11px] ${
+              className={`py-0.5 sm:py-1 uppercase tracking-wider text-[9px] sm:text-[11px] ${
                 isWeekend
                   ? 'text-slate-400 dark:text-slate-500 font-medium'
                   : 'text-slate-600 dark:text-slate-300'
@@ -189,7 +189,7 @@ export const CalendarMonth: React.FC<CalendarMonthProps> = ({
                   ? `${calDay.dayNumber} de ${formatMonthYearPT(currentYear, currentMonth)} - Feriado: ${calDay.holidayName}`
                   : `${calDay.dayNumber} de ${formatMonthYearPT(currentYear, currentMonth)}`
               }
-              className={`min-h-[48px] sm:min-h-[72px] p-1 sm:p-2 rounded-lg text-left flex flex-col justify-between transition-all relative border cursor-pointer ${
+              className={`min-h-[36px] xs:min-h-[42px] sm:min-h-[72px] p-1 sm:p-2 rounded-lg text-left flex flex-col justify-between transition-all relative border cursor-pointer ${
                 isSelected
                   ? 'ring-2 ring-blue-600 dark:ring-blue-500 border-blue-600 bg-blue-50/80 dark:bg-blue-950/50 z-10'
                   : calDay.isToday
@@ -206,7 +206,7 @@ export const CalendarMonth: React.FC<CalendarMonthProps> = ({
                 <span
                   className={`text-[11px] sm:text-sm font-semibold tabular-nums shrink-0 ${
                     calDay.isToday
-                      ? 'w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] sm:text-xs shadow-xs'
+                      ? 'w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[9px] xs:text-[10px] sm:text-xs shadow-xs'
                       : isSelected
                       ? 'text-blue-700 dark:text-blue-300 font-bold'
                       : calDay.holidayName
@@ -222,7 +222,7 @@ export const CalendarMonth: React.FC<CalendarMonthProps> = ({
                 {calDay.holidayName && (
                   <>
                     <span
-                      className="sm:hidden w-1.5 h-1.5 rounded-full bg-rose-500 mt-1 shrink-0"
+                      className="sm:hidden w-1.5 h-1.5 rounded-full bg-rose-500 mt-0.5 shrink-0"
                       title={`Feriado: ${calDay.holidayName}`}
                     />
                     <span
@@ -237,18 +237,18 @@ export const CalendarMonth: React.FC<CalendarMonthProps> = ({
 
               {/* Day Tasks Indicator Block */}
               {hasTasks ? (
-                <div className="mt-0.5 sm:mt-1 w-full">
+                <div className="mt-0.5 w-full">
                   <div
-                    className={`text-[9px] sm:text-xs font-semibold px-1 py-0.5 sm:px-1.5 sm:py-0.5 rounded truncate flex items-center justify-center sm:justify-start gap-0.5 sm:gap-1 ${
+                    className={`text-[8px] xs:text-[9px] sm:text-xs font-semibold px-0.5 py-0.2 sm:px-1.5 sm:py-0.5 rounded truncate flex items-center justify-center sm:justify-start gap-0.5 sm:gap-1 ${
                       allCompleted
                         ? 'bg-emerald-100/90 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
                         : 'bg-blue-100/90 text-blue-900 dark:bg-blue-950/80 dark:text-blue-300'
                     }`}
                   >
                     {allCompleted ? (
-                      <CheckCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
+                      <CheckCircle className="w-2 h-2 sm:w-3 sm:h-3 shrink-0" />
                     ) : (
-                      <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 shrink-0" />
+                      <Clock className="w-2 h-2 sm:w-3 sm:h-3 shrink-0" />
                     )}
                     <span className="tabular-nums font-bold sm:hidden">
                       {dayTasks.length}
@@ -259,7 +259,7 @@ export const CalendarMonth: React.FC<CalendarMonthProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="h-1.5 sm:h-3" />
+                <div className="h-1 sm:h-3" />
               )}
             </button>
           );

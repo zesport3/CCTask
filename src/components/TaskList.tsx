@@ -4,6 +4,8 @@ import {
   Plus,
   ChevronRight,
   X,
+  CheckCircle2,
+  Check,
 } from 'lucide-react';
 import { AccountingTask } from '../types/accounting';
 import {
@@ -30,6 +32,7 @@ export const TaskList: React.FC<TaskListProps> = ({
   onClearDateFilter,
   onSelectTask,
   onOpenNewTask,
+  onToggleTaskComplete,
 }) => {
   // Check if selectedDate is a Portuguese holiday
   const selectedHoliday = React.useMemo(() => {
@@ -131,34 +134,78 @@ export const TaskList: React.FC<TaskListProps> = ({
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="max-h-[36vh] sm:max-h-none overflow-y-auto pr-0.5 space-y-2">
           {dayTasks.map((task) => {
             const totalClients = task.clients.length;
             const doneClients = task.clients.filter((c) => c.status === 'done').length;
-            const isAllDone = totalClients > 0 && doneClients === totalClients;
+            const isAllDone =
+              totalClients > 0 ? doneClients === totalClients : Boolean(task.isCompleted);
 
             return (
               <div
                 key={task.id}
                 onClick={() => onSelectTask(task)}
-                className={`p-3.5 sm:p-4 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer shadow-xs ${
+                className={`p-2.5 sm:p-3.5 rounded-xl border transition-all flex items-center justify-between gap-2.5 sm:gap-3 cursor-pointer shadow-xs ${
                   isAllDone
-                    ? 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/15 dark:bg-emerald-950/10'
+                    ? 'border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/30 dark:bg-emerald-950/20'
                     : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-500 dark:hover:border-blue-500'
                 }`}
                 title="Clique para ver os clientes ou alterar apontamentos desta tarefa"
               >
+                {/* Botão Dedicado para Marcar como Concluída */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleTaskComplete?.(task);
+                  }}
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 border ${
+                    isAllDone
+                      ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs active:scale-95'
+                      : 'bg-slate-50 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:text-emerald-600 active:scale-95'
+                  }`}
+                  title={
+                    isAllDone
+                      ? 'Tarefa concluída! Clique para desmarcar'
+                      : 'Clique para colocar esta tarefa como concluída'
+                  }
+                  aria-label={
+                    isAllDone
+                      ? 'Desmarcar tarefa concluída'
+                      : 'Marcar tarefa como concluída'
+                  }
+                >
+                  {isAllDone ? (
+                    <Check className="w-5 h-5 stroke-[2.5]" />
+                  ) : (
+                    <CheckCircle2 className="w-5 h-5" />
+                  )}
+                </button>
+
                 {/* Apenas o título da tarefa */}
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
+                  <h4
+                    className={`text-xs sm:text-base font-bold truncate transition-colors ${
+                      isAllDone
+                        ? 'text-emerald-900 dark:text-emerald-200 line-through decoration-emerald-500/50'
+                        : 'text-slate-900 dark:text-white'
+                    }`}
+                  >
                     {task.title}
                   </h4>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate sm:hidden">
+                    {totalClients > 0
+                      ? `${doneClients}/${totalClients} empresas feitas`
+                      : isAllDone
+                      ? 'Concluída'
+                      : 'Pendente'}
+                  </div>
                 </div>
 
                 {/* Quantos clientes já estão concluídos / todos os clientes */}
-                <div className="shrink-0 flex items-center gap-2">
+                <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
                   <span
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold tabular-nums border ${
+                    className={`hidden sm:inline-block px-2.5 py-1 rounded-lg text-xs font-semibold tabular-nums border ${
                       isAllDone
                         ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                         : doneClients > 0
@@ -166,7 +213,7 @@ export const TaskList: React.FC<TaskListProps> = ({
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
                     }`}
                   >
-                    {doneClients} / {totalClients} {totalClients === 1 ? 'cliente concluído' : 'clientes concluídos'}
+                    {doneClients} / {totalClients} {totalClients === 1 ? 'empresa' : 'empresas'}
                   </span>
                   <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                 </div>

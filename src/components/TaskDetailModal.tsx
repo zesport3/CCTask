@@ -73,13 +73,40 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       return c;
     });
 
+    const allDone = updatedClients.length > 0 && updatedClients.every((c) => c.status === 'done');
+
     const updatedTask: AccountingTask = {
       ...task,
       clients: updatedClients,
+      isCompleted: allDone,
       updatedAt: new Date().toISOString(),
     };
 
     onUpdateTask(updatedTask);
+  };
+
+  // Handler for toggling the whole task as complete / reopening
+  const handleToggleAllComplete = () => {
+    const nowIso = new Date().toISOString();
+    if (task.clients.length === 0) {
+      onUpdateTask({
+        ...task,
+        isCompleted: !task.isCompleted,
+        updatedAt: nowIso,
+      });
+      return;
+    }
+
+    const allDone = task.clients.length > 0 && task.clients.every((c) => c.status === 'done');
+    const newStatus: ClientTaskStatus = allDone ? 'in_progress' : 'done';
+    const updatedClients = task.clients.map((c) => ({ ...c, status: newStatus }));
+
+    onUpdateTask({
+      ...task,
+      clients: updatedClients,
+      isCompleted: !allDone,
+      updatedAt: nowIso,
+    });
   };
 
   // Handler for removing a client from this task
@@ -208,10 +235,25 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Header Complete Button */}
+            <button
+              type="button"
+              onClick={handleToggleAllComplete}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer shadow-xs ${
+                isCompleted
+                  ? 'bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+              title={isCompleted ? 'Desmarcar tarefa concluída' : 'Marcar tarefa como concluída'}
+            >
+              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span className="hidden xs:inline">{isCompleted ? 'Concluída' : 'Concluir'}</span>
+            </button>
+
             <button
               type="button"
               onClick={() => onEditTask(task)}
-              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
               title="Editar dados da tarefa"
             >
               <Edit className="w-4 h-4" />
@@ -219,7 +261,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <button
               type="button"
               onClick={() => onDeleteTask(task.id)}
-              className="p-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded-lg transition-colors"
+              className="p-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded-lg transition-colors cursor-pointer"
               title="Eliminar tarefa"
             >
               <Trash2 className="w-4 h-4" />
@@ -227,7 +269,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition-colors ml-1"
+              className="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-lg transition-colors ml-1 cursor-pointer"
               aria-label="Fechar janela"
             >
               <X className="w-5 h-5" />
@@ -236,16 +278,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         </div>
 
         {/* Modal Body (Scrollable) */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {/* Progress Banner & Metrics */}
-          <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
+          <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 sm:p-4 space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
               <span className="font-bold text-slate-900 dark:text-white">
                 Progresso Geral da Tarefa
               </span>
               <span className="text-xs font-semibold tabular-nums text-slate-600 dark:text-slate-300">
                 {summary.total > 0
-                  ? `${summary.done} de ${summary.total} clientes tratados (${summary.percentage}%)`
+                  ? `${summary.done} de ${summary.total} empresas tratadas (${summary.percentage}%)`
                   : isCompleted
                   ? 'Concluída manualmente'
                   : 'Pendente'}
@@ -263,10 +305,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
 
             {/* Breakdown Badges / Counts */}
-            {summary.total > 0 ? (
+            {summary.total > 0 && (
               <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-2 text-center">
-                  <div className="text-slate-400 text-[11px]">Total Clientes</div>
+                  <div className="text-slate-400 text-[11px]">Total Empresas</div>
                   <div className="font-bold text-base text-slate-800 dark:text-slate-200 tabular-nums">
                     {summary.total}
                   </div>
@@ -284,28 +326,30 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center justify-between text-xs pt-1">
-                <span className="text-slate-500">Esta tarefa não tem clientes associados.</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onUpdateTask({
-                      ...task,
-                      isCompleted: !task.isCompleted,
-                      updatedAt: new Date().toISOString(),
-                    });
-                  }}
-                  className={`px-3 py-1.5 rounded-lg font-semibold transition-colors ${
-                    task.isCompleted
-                      ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
-                >
-                  {task.isCompleted ? 'Desmarcar Concluída' : 'Marcar como Concluída'}
-                </button>
-              </div>
             )}
+
+            {/* Prominent Action Button to Mark Entire Task as Done */}
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-t border-slate-200/80 dark:border-slate-700/80">
+              <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                {isCompleted
+                  ? '✅ Esta tarefa está concluída.'
+                  : 'Colocar todos os clientes como concluídos:'}
+              </span>
+              <button
+                type="button"
+                onClick={handleToggleAllComplete}
+                className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer ${
+                  isCompleted
+                    ? 'bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/90 dark:hover:bg-emerald-900 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white'
+                }`}
+              >
+                <Check className="w-4 h-4 stroke-[2.5]" />
+                <span>
+                  {isCompleted ? 'Desmarcar Concluída (Reabrir)' : 'Marcar Tarefa como Concluída'}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* General Task Observations Field */}
