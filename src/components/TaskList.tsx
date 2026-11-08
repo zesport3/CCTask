@@ -152,17 +152,17 @@ export const TaskList: React.FC<TaskListProps> = ({
                 }`}
                 title="Clique para ver os clientes ou alterar apontamentos desta tarefa"
               >
-                {/* Botão Dedicado para Marcar como Concluída */}
+                {/* Botão Dedicado para Marcar como Concluída (Grande e fácil de carregar) */}
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onToggleTaskComplete?.(task);
                   }}
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 border ${
+                  className={`w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 border shadow-xs active:scale-95 ${
                     isAllDone
-                      ? 'bg-emerald-500 text-white border-emerald-600 shadow-xs active:scale-95'
-                      : 'bg-slate-50 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:text-emerald-600 active:scale-95'
+                      ? 'bg-emerald-500 text-white border-emerald-600 shadow-md shadow-emerald-500/20 ring-2 ring-emerald-400/50'
+                      : 'bg-slate-50 dark:bg-slate-800/90 text-slate-400 dark:text-slate-400 border-slate-300 dark:border-slate-700 hover:border-emerald-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
                   }`}
                   title={
                     isAllDone
@@ -176,9 +176,9 @@ export const TaskList: React.FC<TaskListProps> = ({
                   }
                 >
                   {isAllDone ? (
-                    <Check className="w-5 h-5 stroke-[2.5]" />
+                    <Check className="w-6 h-6 stroke-[3]" />
                   ) : (
-                    <CheckCircle2 className="w-5 h-5" />
+                    <CheckCircle2 className="w-6 h-6" />
                   )}
                 </button>
 
