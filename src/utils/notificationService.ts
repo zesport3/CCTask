@@ -1,5 +1,6 @@
 import { AccountingTask } from '../types/accounting';
 import { getTodayDateString, formatDatePT, PT_MONTHS } from './dateUtils';
+import { safeStorage } from './safeStorage';
 
 export type NotificationPermissionState = 'granted' | 'denied' | 'default' | 'unsupported';
 
@@ -41,12 +42,17 @@ export function getMillisecondsUntilNextTargetTime(targetHour: number = 9, targe
  * at the exact scheduled timestamp even if the web app/browser is closed!
  */
 export function isNotificationTriggerSupported(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof Notification !== 'undefined' &&
-    'showTrigger' in Notification.prototype &&
-    typeof (window as unknown as { TimestampTrigger?: unknown }).TimestampTrigger !== 'undefined'
-  );
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      typeof Notification !== 'undefined' &&
+      Notification.prototype !== undefined &&
+      'showTrigger' in Notification.prototype &&
+      typeof (window as unknown as { TimestampTrigger?: unknown }).TimestampTrigger !== 'undefined'
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -70,22 +76,34 @@ export function formatTaskNotificationTitle(task: AccountingTask): string {
  * Checks if HTML5 Web Notifications are supported in the current environment
  */
 export function isNotificationSupported(): boolean {
-  return typeof window !== 'undefined' && 'Notification' in window;
+  try {
+    return typeof window !== 'undefined' && 'Notification' in window && typeof Notification !== 'undefined';
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Checks if Service Worker notifications (required for Mobile Lock Screen) are supported
  */
 export function isServiceWorkerSupported(): boolean {
-  return typeof window !== 'undefined' && 'serviceWorker' in navigator;
+  try {
+    return typeof window !== 'undefined' && 'serviceWorker' in navigator;
+  } catch {
+    return false;
+  }
 }
 
 /**
- * Returns current browser notification permission
+ * Returns current browser notification permission safely
  */
 export function getNotificationPermission(): NotificationPermissionState {
   if (!isNotificationSupported()) return 'unsupported';
-  return Notification.permission as NotificationPermissionState;
+  try {
+    return Notification.permission as NotificationPermissionState;
+  } catch {
+    return 'unsupported';
+  }
 }
 
 /**
@@ -231,9 +249,9 @@ export async function checkAndSendDueDateNotifications(
       const legacyKey10 = `contab_notif_10h_${todayStr}_${task.id}`;
       const legacyKey = `contab_notif_${todayStr}_${task.id}`;
       const alreadyNotified =
-        localStorage.getItem(storageKey) ||
-        localStorage.getItem(legacyKey10) ||
-        localStorage.getItem(legacyKey);
+        safeStorage.getItem(storageKey) ||
+        safeStorage.getItem(legacyKey10) ||
+        safeStorage.getItem(legacyKey);
 
       if (!alreadyNotified) {
         // Title format requested: "dia 5 outubro - envio saft"
@@ -259,7 +277,7 @@ export async function checkAndSendDueDateNotifications(
         });
 
         if (sent) {
-          localStorage.setItem(storageKey, new Date().toISOString());
+          safeStorage.setItem(storageKey, new Date().toISOString());
           sentCount++;
         }
       }
@@ -313,7 +331,7 @@ export async function scheduleUpcomingNotifications(
       if (msDiff > 30 * 24 * 60 * 60 * 1000) continue;
 
       const scheduleKey = `contab_sched_trigger_${task.id}_${task.date}`;
-      if (localStorage.getItem(scheduleKey)) continue;
+      if (safeStorage.getItem(scheduleKey)) continue;
 
       const title = formatTaskNotificationTitle(task);
       const totalClients = task.clients.length;
@@ -346,7 +364,7 @@ export async function scheduleUpcomingNotifications(
             ],
           } as NotificationOptions & Record<string, unknown>);
 
-          localStorage.setItem(scheduleKey, targetTime.toISOString());
+          safeStorage.setItem(scheduleKey, targetTime.toISOString());
           scheduledCount++;
         } catch (err) {
           console.warn('Erro ao agendar trigger para tarefa:', task.title, err);

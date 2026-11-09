@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { safeStorage } from '../utils/safeStorage';
 
 interface Props {
   children: ReactNode;
@@ -29,8 +30,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleResetStorage = () => {
     if (window.confirm('Deseja limpar os dados locais do navegador para restaurar a aplicação?')) {
-      localStorage.removeItem('contab_tasks_v1');
-      localStorage.removeItem('contab_clients_v1');
+      try {
+        safeStorage.removeItem('contab_tasks_v1');
+        safeStorage.removeItem('contab_clients_v1');
+      } catch {}
       window.location.reload();
     }
   };

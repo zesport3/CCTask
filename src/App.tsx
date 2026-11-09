@@ -21,6 +21,7 @@ import {
   loadAppData,
   saveAppData,
 } from './utils/storage';
+import { safeStorage } from './utils/safeStorage';
 import {
   calculateNextOccurrence,
   formatDatePT,
@@ -83,21 +84,32 @@ export default function App() {
     onConfirm: () => {},
   });
 
-  // Dark Mode State
+  // Dark Mode State with safeStorage (prevents iOS standalone SecurityError)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('contab_theme_v1');
-    if (saved) return saved === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    try {
+      const saved = safeStorage.getItem('contab_theme_v1');
+      if (saved) return saved === 'dark';
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+    } catch {
+      // Fallback
+    }
+    return false;
   });
 
-  // Apply dark mode class to html document
+  // Apply dark mode class to html document safely
   useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('contab_theme_v1', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('contab_theme_v1', 'light');
+    try {
+      if (isDarkMode) {
+        document.documentElement.classList.add('dark');
+        safeStorage.setItem('contab_theme_v1', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        safeStorage.setItem('contab_theme_v1', 'light');
+      }
+    } catch {
+      // Ignore DOM storage restrictions
     }
   }, [isDarkMode]);
 

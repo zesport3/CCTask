@@ -23,21 +23,70 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
       (function() {
+        // Theme initialization
         try {
           var saved = localStorage.getItem('contab_theme_v1');
-          if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
           } else {
             document.documentElement.classList.remove('dark');
           }
         } catch (e) {}
+
+        // Fix for iOS Safari WebKit Standalone PWA Background Freeze
+        window.addEventListener('pageshow', function(event) {
+          if (event.persisted) {
+            window.location.reload();
+          }
+        });
+
+        // Global Error Fallback so iOS users never see an unresponsive white screen
+        window.addEventListener('error', function(e) {
+          var hint = document.getElementById('pwa-loader-hint');
+          var retryBtn = document.getElementById('pwa-reload-btn');
+          if (hint && retryBtn) {
+            hint.textContent = 'A carregar os recursos da aplicação...';
+            retryBtn.style.display = 'inline-block';
+          }
+        });
       })();
     </script>
-    <script type="module" crossorigin src="./assets/index-D64Qy2N4.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-D9F_Dw7U.css">
+    <script type="module" crossorigin src="./assets/index-CemjnWxn.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-C95q2hrS.css">
   <link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
   <body class="bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white dark:bg-slate-950 dark:text-slate-100 min-h-screen">
-    <div id="root"></div>
+    <div id="root">
+      <!-- Instant App Shell displayed on iOS while bundle hydrates -->
+      <div id="pwa-initial-loader" style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;">
+        <div style="width: 64px; height: 64px; border-radius: 16px; background: #2563eb; display: flex; align-items: center; justify-content: center; margin-bottom: 16px; box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.4);">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+            <line x1="16" x2="16" y1="2" y2="6"/>
+            <line x1="8" x2="8" y1="2" y2="6"/>
+            <line x1="3" x2="21" y1="10" y2="10"/>
+            <path d="m9 16 2 2 4-4"/>
+          </svg>
+        </div>
+        <h1 style="font-size: 20px; font-weight: 700; margin: 0 0 6px 0; letter-spacing: -0.02em;">ContabTarefas</h1>
+        <p id="pwa-loader-hint" style="font-size: 13px; color: #64748b; margin: 0; max-width: 280px; line-height: 1.5;">
+          A carregar gabinete e prazos...
+        </p>
+        <button id="pwa-reload-btn" type="button" onclick="window.location.reload(true)" style="display: none; margin-top: 16px; padding: 8px 18px; font-size: 13px; font-weight: 600; color: #ffffff; background-color: #2563eb; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">
+          Recarregar Aplicação
+        </button>
+        <script>
+          // If React does not replace this within 3.5s, display the reload button
+          setTimeout(function() {
+            var btn = document.getElementById('pwa-reload-btn');
+            var hint = document.getElementById('pwa-loader-hint');
+            if (btn && hint && document.getElementById('pwa-initial-loader')) {
+              hint.textContent = 'Se a aplicação não iniciar automaticamente:';
+              btn.style.display = 'inline-block';
+            }
+          }, 3500);
+        </script>
+      </div>
+    </div>
   </body>
 </html>
 

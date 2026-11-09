@@ -1,6 +1,7 @@
 import { AccountingTask, AppBackupData, Client, TaskProgressSummary, GeneralTaskStatus } from '../types/accounting';
 import { getTodayDateString } from './dateUtils';
 import { generateFiscalTasksForMonth } from './fiscalCalendar';
+import { safeStorage } from './safeStorage';
 
 const STORAGE_KEY_TASKS = 'contab_tasks_v1';
 const STORAGE_KEY_CLIENTS = 'contab_clients_v1';
@@ -62,17 +63,17 @@ export function calculateTaskProgress(task: AccountingTask, todayStr: string = g
  */
 export function loadAppData(): { tasks: AccountingTask[]; clients: Client[] } {
   try {
-    const isCleaned = localStorage.getItem('contab_clean_start_v2');
+    const isCleaned = safeStorage.getItem('contab_clean_start_v2');
     if (!isCleaned) {
       // User explicitly requested to remove all examples: clear demo items
-      localStorage.removeItem(STORAGE_KEY_TASKS);
-      localStorage.removeItem(STORAGE_KEY_CLIENTS);
-      localStorage.setItem('contab_clean_start_v2', 'true');
+      safeStorage.removeItem(STORAGE_KEY_TASKS);
+      safeStorage.removeItem(STORAGE_KEY_CLIENTS);
+      safeStorage.setItem('contab_clean_start_v2', 'true');
       return { tasks: [], clients: [] };
     }
 
-    const storedClientsStr = localStorage.getItem(STORAGE_KEY_CLIENTS);
-    const storedTasksStr = localStorage.getItem(STORAGE_KEY_TASKS);
+    const storedClientsStr = safeStorage.getItem(STORAGE_KEY_CLIENTS);
+    const storedTasksStr = safeStorage.getItem(STORAGE_KEY_TASKS);
 
     let clients: Client[] = [];
     let tasks: AccountingTask[] = [];
@@ -96,7 +97,7 @@ export function loadAppData(): { tasks: AccountingTask[]; clients: Client[] } {
     }
 
     // Predefine official Portuguese accounting fiscal calendar tasks if not yet loaded
-    const fiscalInitialized = localStorage.getItem('contab_fiscal_tasks_v1');
+    const fiscalInitialized = safeStorage.getItem('contab_fiscal_tasks_v1');
     if (!fiscalInitialized) {
       const now = new Date();
       // Use current year/month or October 2026 if context year is 2026
@@ -115,8 +116,8 @@ export function loadAppData(): { tasks: AccountingTask[]; clients: Client[] } {
           }
         }
       }
-      localStorage.setItem('contab_fiscal_tasks_v1', 'true');
-      localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
+      safeStorage.setItem('contab_fiscal_tasks_v1', 'true');
+      safeStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
     }
 
     return { tasks, clients };
@@ -131,8 +132,8 @@ export function loadAppData(): { tasks: AccountingTask[]; clients: Client[] } {
  */
 export function saveAppData(tasks: AccountingTask[], clients: Client[]): { success: boolean; error?: string } {
   try {
-    localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
-    localStorage.setItem(STORAGE_KEY_CLIENTS, JSON.stringify(clients));
+    safeStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(tasks));
+    safeStorage.setItem(STORAGE_KEY_CLIENTS, JSON.stringify(clients));
     return { success: true };
   } catch (err: unknown) {
     console.error('Erro ao gravar dados no LocalStorage:', err);

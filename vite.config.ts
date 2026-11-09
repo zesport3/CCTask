@@ -14,14 +14,14 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
-          id: './',
+          id: './index.html',
           name: 'ContabTarefas - Gestão de Gabinete',
           short_name: 'Contab',
           description: 'Gestão simples de calendário e tarefas com clientes associados para gabinetes de contabilidade.',
           theme_color: '#2563eb',
           background_color: '#f8fafc',
           display: 'standalone',
-          start_url: './',
+          start_url: 'index.html',
           scope: './',
           icons: [
             {
@@ -53,6 +53,10 @@ export default defineConfig(() => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           importScripts: ['sw-custom.js'],
+          navigateFallback: 'index.html',
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
         },
         devOptions: {
           enabled: true,
