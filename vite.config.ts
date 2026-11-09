@@ -5,8 +5,10 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
+  const basePath = process.env.BASE_URL || './';
+  const manifestBase = basePath === './' ? './' : basePath;
   return {
-    base: './',
+    base: basePath,
     plugins: [
       react(),
       tailwindcss(),
@@ -14,15 +16,15 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
-          id: './index.html',
+          id: manifestBase,
           name: 'ContabTarefas - Gestão de Gabinete',
           short_name: 'Contab',
           description: 'Gestão simples de calendário e tarefas com clientes associados para gabinetes de contabilidade.',
           theme_color: '#2563eb',
           background_color: '#f8fafc',
           display: 'standalone',
-          start_url: 'index.html',
-          scope: './',
+          start_url: manifestBase,
+          scope: manifestBase,
           icons: [
             {
               src: 'icon.svg',

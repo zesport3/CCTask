@@ -23,6 +23,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
       (function() {
+        // Trailing-slash normalization for GitHub Pages / subpaths on iOS Safari
+        try {
+          var p = window.location.pathname;
+          if (p && !p.endsWith('/') && !p.substring(p.lastIndexOf('/')).includes('.')) {
+            window.location.replace(p + '/' + window.location.search + window.location.hash);
+            return;
+          }
+        } catch (e) {}
+
         // Theme initialization
         try {
           var saved = localStorage.getItem('contab_theme_v1');
